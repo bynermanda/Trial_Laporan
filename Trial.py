@@ -646,6 +646,14 @@ else:
                 st.session_state.barcode_input = barcode_data
                 handle_scan()
 
+            st.divider()
+            st.write("### ⌨️ Input KANBAN Manual")
+            manual_finish = st.text_input("Ketik Part No", key="manual_part_finish_input").strip().upper()
+            if st.button("✅ Konfirmasi Input Manual Finish", use_container_width=True):
+                if manual_finish:
+                    st.session_state.barcode_input = manual_finish
+                    handle_scan()
+
     elif status_kerja == "FINISHING":
         dp = st.session_state.get('current_part')
         if dp:
