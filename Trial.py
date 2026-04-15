@@ -709,17 +709,38 @@ else:
                         "Status": "FINISH"
                     }
                     if simpan_ke_sheet(data_finish, "FINISH"):
+                        st.session_state.data_sph_terkirim = True
                         st.success("✅ SPH Terkirim!")
-                        st.balloons()
-                        st.rerun()
 
-            if st.button("🏁 SELESAI & SCAN BARU", type="primary", use_container_width=True):
-                keys_to_reset = ['status_kerja', 'current_part', 'waktu_start', 'waktu_end', 'data_sph_terkirim', 'available_processes', 'sudah_start_diklik']
-                for k in keys_to_reset:
-                    if k in st.session_state: 
-                        del st.session_state[k]
-                st.session_state.status_kerja = "IDLE"
-                st.rerun()
+            if st.session_state.get('data_sph_terkirim'):
+                st.divider()
+                st.subheader("📊 Ringkasan Hasil Produksi")
+                
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Persentase Produksi", f"{persen_prod:.2f} %")
+                c2.metric("Total Jam Kerja", f"{round(durasi_bersih/60, 2)} Jam")
+                c3.metric("Rasio NG", f"{(ng/act * 100) if act > 0 else 0:.2f} %")
+
+                st.info("DATA SPH sudah tercatat.")
+                st.divider()
+    
+                if st.button("🏁 SELESAI & SCAN PART BARU", type="primary", use_container_width=True):
+                    # RESET SEMUA SESSION STATE
+                    keys_to_reset = [
+                        'status_kerja', 'current_part', 'waktu_start', 'waktu_end', 
+                        'data_sph_terkirim', 'available_processes', 'sudah_start_diklik',
+                        'barcode_input', 'is_submitting', 'proses_data', 'abnormal_data'
+                    ]
+                    for k in keys_to_reset:
+                        if k in st.session_state: 
+                            del st.session_state[k]
+
+                    # Set ulang status ke IDLE agar siap scan part baru
+                    st.session_state.status_kerja = "IDLE"
+                    st.balloons()
+                    st.success("✅ Laporan Proses selesai! Siap untuk scan part baru.")
+                    time.sleep(2)
+                    st.rerun()
 
     if st.session_state.get('status_kerja') == "RUNNING":
         col_ref, col_res = st.columns(2)
