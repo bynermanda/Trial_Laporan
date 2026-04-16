@@ -526,11 +526,11 @@ else:
         st.subheader("🔍 Pilih Urutan Proses")
         data_pilihan = st.session_state.get('available_processes', [])
         list_line = main_df['LINE'].unique().tolist() if 'LINE' in main_df.columns else []
-        if not any(p['URUTAN'] == 'DPMR' for p in data_pilihan):
-            sample_part_name = data_pilihan[0]['Part_Name'] if data_pilihan else "REPAIR"
-            sample_part_no = data_pilihan[0]['Part_No'] if data_pilihan else "REPAIR"
-            sample_model = data_pilihan[0]['MODEL'] if data_pilihan else "REPAIR"
-            sample_line = data_pilihan[0]['LINE'] if data_pilihan else "-"
+        if not any(p.get('URUTAN') == 'DPMR' for p in data_pilihan):
+            sample_part_name = data_pilihan[0].get('Part_Name') if data_pilihan else "REPAIR"
+            sample_part_no = data_pilihan[0].get('Part_No') if data_pilihan else "REPAIR"
+            sample_model = data_pilihan[0].get('MODEL') if data_pilihan else "REPAIR"
+            sample_line = data_pilihan[0].get('LINE') if data_pilihan else "-"
 
             dpmr_data = {
             'URUTAN': 'DPMR',
@@ -542,25 +542,23 @@ else:
         }
         data_pilihan.append(dpmr_data)
         
-        if data_pilihan:
-            actual_line = st.selectbox("Pilih Line Produksi (Actual Line)", options=list_line)
-            opsi_display = {f"{p['URUTAN']} | {p['Part_Name']}": p for p in data_pilihan}
-            pilihan_user = st.selectbox("Pilih Urutan Proses Produksi", options=list(opsi_display.keys()))
-
-            if st.button("Konfirmasi & Mulai Kerja"):
-                detail = opsi_display[pilihan_user]
-                st.session_state.current_part = {
-                    "part_no": detail.get('Part_No', 'N/A'),
-                    "part_name": detail.get('Part_Name', 'N/A'),
-                    "model": detail.get('MODEL', 'N/A'),
-                    "sec_pcs": detail.get('SEC /PCS', 0),
-                    "line": detail.get('LINE', 'N/A'),
-                    "Actual_Line": actual_line,
-                    "urutan_proses": detail.get('URUTAN', 'DPMR')
-                }
-                st.session_state.status_kerja = "RUNNING"
-                st.session_state.waktu_start = get_waktu_wib()
-                st.rerun()
+        actual_line = st.selectbox("Pilih Line Produksi (Actual Line)", options=list_line)
+        opsi_display = {f"{p['URUTAN']} | {p['Part_Name']}": p for p in data_pilihan}
+        pilihan_user = st.selectbox("Pilih Urutan Proses Produksi", options=list(opsi_display.keys()))
+        if st.button("Konfirmasi & Mulai Kerja"):
+            detail = opsi_display[pilihan_user]
+            st.session_state.current_part = {
+                "part_no": detail.get('Part_No', 'N/A'),
+                "part_name": detail.get('Part_Name', 'N/A'),
+                "model": detail.get('MODEL', 'N/A'),
+                "sec_pcs": detail.get('SEC /PCS', 0),
+                "line": detail.get('LINE', 'N/A'),
+                "Actual_Line": actual_line,
+                "urutan_proses": detail.get('URUTAN', 'DPMR')
+            }
+            st.session_state.status_kerja = "RUNNING"
+            st.session_state.waktu_start = get_waktu_wib()
+            st.rerun()
 
 
     elif status_kerja == "RUNNING":
