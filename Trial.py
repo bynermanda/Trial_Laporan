@@ -526,6 +526,8 @@ else:
         st.subheader("🔍 Pilih Urutan Proses")
         data_pilihan = st.session_state.get('available_processes', [])
         list_line = main_df['LINE'].unique().tolist() if 'LINE' in main_df.columns else []
+        if "DPMR" not in data_pilihan:
+            data_pilihan.append("DPMR")
         
         if data_pilihan:
             actual_line = st.selectbox("Pilih Line Produksi (Actual Line)", options=list_line)
@@ -533,19 +535,34 @@ else:
             pilihan_user = st.selectbox("Pilih Urutan Proses Produksi", options=list(opsi_display.keys()))
 
             if st.button("Konfirmasi & Mulai Kerja"):
-                detail = opsi_display[pilihan_user]
-                st.session_state.current_part = {
-                    "part_no": detail['Part_No'],
-                    "part_name": detail['Part_Name'],
-                    "model": detail['MODEL'],
-                    "sec_pcs": detail['SEC /PCS'],
-                    "line": detail['LINE'],
-                    "Actual_Line": actual_line,
-                    "urutan_proses": detail['URUTAN']
-                }
-                st.session_state.status_kerja = "RUNNING"
-                st.session_state.waktu_start = get_waktu_wib()
-                st.rerun()
+                is_dpmr = (pilihan_user == "DPMR")
+                
+                if is_dpmr:
+                    first_process_key = list(opsi_display.keys())[0]
+                    base_detail = opsi_display[first_process_key]
+                    st.session_state.current_part = {
+                        "part_no": base_detail['Part_No'],
+                        "part_name": base_detail['Part_Name'],
+                        "model": base_detail['MODEL'],
+                        "sec_pcs": 0,
+                        "line": "N/A",
+                        "Actual_Line": actual_line,
+                        "urutan_proses": "DPMR"
+                    }
+                else:
+                    detail = opsi_display[pilihan_user]
+                    st.session_state.current_part = {
+                        "part_no": detail['Part_No'],
+                        "part_name": detail['Part_Name'],
+                        "model": detail['MODEL'],
+                        "sec_pcs": detail['SEC /PCS'],
+                        "line": detail['LINE'],
+                        "Actual_Line": actual_line,
+                        "urutan_proses": detail['URUTAN']
+                    }
+                    st.session_state.status_kerja = "RUNNING"
+                    st.session_state.waktu_start = get_waktu_wib()
+                    st.rerun()
 
 
     elif status_kerja == "RUNNING":
@@ -609,6 +626,7 @@ else:
                             time.sleep(1)
                         else:
                             st.error("Pilih Kode & Isi Menit!")
+                            st.info("JIKA DPMR MASUKAN JUMLAH PART OK DAN NG DI INPUT ABNORMAL!!!")
 
             st.divider()
 
@@ -674,7 +692,7 @@ else:
             except ValueError:
                 act = 0
                 ng = 0
-            c3.metric("Durasi", f"{jam_bersih} Menit", delta=f"{round(jam_total/60, 2)} Jam")
+            c3.metric("Durasi", f"{round(jam_total,2)} Menit", delta=f"{round(jam_total/60, 2)} Jam")
             c4.metric("Waktu Start", st.session_state.waktu_start.strftime("%H:%M:%S"))
 
             # Potongan Istirahat
@@ -692,9 +710,10 @@ else:
             durasi_bersih = max(0, jam_bersih - total_potongan)
             st.info(f"⏱️ Durasi Bersih: {durasi_bersih:.1f} Menit")
 
+            is_repair = (dp.get('urutan_proses') == "DPMR")
             val_sec_pcs = float(dp.get('sec_pcs', 0))
-            standar_input = (val_sec_pcs * act) / 60 if act > 0 else 0
-            persen_prod = round((standar_input / durasi_bersih) * 100, 2) if durasi_bersih > 0 else 0.0
+            standar_input = (val_sec_pcs * act) / 60 if (act > 0 and not is_repair) else 0
+            persen_prod = round((standar_input / durasi_bersih) * 100, 2) if (durasi_bersih > 0 and not is_repair) else 0.0
 
             if st.button("🚀 Kirim Data SPH", use_container_width=True):
                 if act > 0:
@@ -703,9 +722,9 @@ else:
                         "Waktu_Selesai": waktu_end.strftime("%H:%M:%S"),
                         "ACT": act,
                         "NG": ng,
-                        "%_Prod": f"{persen_prod:.2f}%",
+                        "%_Prod": "N/A" if is_repair else f"{persen_prod:.2f}%",
                         "Total Istirahat": total_potongan,
-                        "Rasio_NG": f"{(ng/act*100):.2f}%" if act > 0 else "0%",
+                        "Rasio_NG": "N/A" if is_repair else (f"{(ng/act*100):.2f}%" if act > 0 else "0%"),
                         "Total_Jam": round(durasi_bersih/60, 2),
                         "Status": "FINISH"
                     }
@@ -714,7 +733,7 @@ else:
                         st.success("✅ SPH Terkirim!")
 
                 else:
-                    st.error("⚠️ ACT harus lebih dari 0")
+                    st.error("⚠️ ACT harus diisi di halaman atas")
 
             if st.session_state.get('data_sph_terkirim'):
                 st.divider()
