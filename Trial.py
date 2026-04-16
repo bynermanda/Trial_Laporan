@@ -582,7 +582,7 @@ else:
 
             # --- BAGIAN BARU: INPUT ABNORMAL SAAT RUNNING ---
             with st.expander("⚠️ INPUT ABNORMAL", expanded=False):
-                st.write("Input akan langsung tersimpan ke database tanpa menghentikan proses.")
+                st.write("Input akan langsung tersimpan ke database. Jika DPMR tulis OK dan NG total di Keterangan.")
                 list_kode = ["A [Ganti Proses]", "B [Ganti/Tambah Coil]", "C [Perikasa ATA]", "D [Trial]", "E [2S]", "F [Briefing Rutin]", "G1 [Material NG dan Tukar Proses]",
                             "G2 [Kualitas NG dan Tukar Proses]", "H [Tooling]", "I [Mesin Abnormal]", "K1 [Penaganan Kualitas NG]", "K2 [Penanganan dies NG]", "L [Kekurangan Material]",
                             "M [Lain-Lain]", "N [No KANBAN Plan]", "O [DPMR]"]
