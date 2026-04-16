@@ -510,7 +510,7 @@ else:
                             st.session_state.status_kerja = "IDLE"
                             
                             st.success(f"✅ Check-Out Berhasil! Total: {total_jam_shift} hours")
-                            time.sleep(2)
+                            time.sleep(3)
                             st.rerun()
                         else:
                             st.error("❌ No open Check-In found!")
@@ -662,7 +662,8 @@ else:
             waktu_start = st.session_state.get('waktu_start', get_waktu_wib())
             waktu_end = st.session_state.get('waktu_end', get_waktu_wib())
             durasi = waktu_end.replace(tzinfo=None) - waktu_start.replace(tzinfo=None)
-            jam_total = round(durasi.total_seconds() / 60, 2)
+            jam_total = durasi.total_seconds() / 60
+            jam_bersih = jam_total % 1440
 
             c1, c2, c3, c4 = st.columns(4)
             act_raw = c1.text_input("Jumlah ACT", value="0")
@@ -688,7 +689,7 @@ else:
             pilihan_break = st.multiselect("Pilih:", options=list(DAFTAR_BREAK.keys()))
             extra_custom = st.number_input("Lainnya (Menit)", min_value=0, step=1, value=0)
             total_potongan = sum([DAFTAR_BREAK[item] for item in pilihan_break]) + extra_custom
-            durasi_bersih = max(0, jam_total - total_potongan)
+            durasi_bersih = max(0, jam_bersih - total_potongan)
             st.info(f"⏱️ Durasi Bersih: {durasi_bersih:.1f} Menit")
 
             val_sec_pcs = float(dp.get('sec_pcs', 0))
@@ -711,6 +712,9 @@ else:
                     if simpan_ke_sheet(data_finish, "FINISH"):
                         st.session_state.data_sph_terkirim = True
                         st.success("✅ SPH Terkirim!")
+
+                else:
+                    st.error("⚠️ ACT harus lebih dari 0")
 
             if st.session_state.get('data_sph_terkirim'):
                 st.divider()
@@ -761,4 +765,3 @@ else:
                 if k in st.session_state: 
                     del st.session_state[k]
             st.rerun()
-
