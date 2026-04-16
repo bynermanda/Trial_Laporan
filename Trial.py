@@ -674,7 +674,7 @@ else:
             except ValueError:
                 act = 0
                 ng = 0
-            c3.metric("Durasi", f"{jam_total} Menit", delta=f"{round(jam_total/60, 2)} Jam")
+            c3.metric("Durasi", f"{jam_bersih} Menit", delta=f"{round(jam_total/60, 2)} Jam")
             c4.metric("Waktu Start", st.session_state.waktu_start.strftime("%H:%M:%S"))
 
             # Potongan Istirahat
