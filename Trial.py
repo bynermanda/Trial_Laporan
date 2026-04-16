@@ -540,7 +540,7 @@ else:
             'LINE': sample_line,
             'SEC /PCS': 0
         }
-        data_pilihan.append(dpmr_data)
+            data_pilihan.append(dpmr_data)
         
         actual_line = st.selectbox("Pilih Line Produksi (Actual Line)", options=list_line)
         opsi_display = {f"{p['URUTAN']} | {p['Part_Name']}": p for p in data_pilihan}
