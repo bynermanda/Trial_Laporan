@@ -651,6 +651,7 @@ else:
                         st.rerun()
             else:
                 st.success("✅ Proses Sudah Dimulai")
+                st.info("JIKA DPMR MASUKAN JUMLAH PART OK DAN NG DI INPUT ABNORMAL!!!")
 
             st.divider()
 
