@@ -525,7 +525,10 @@ else:
     elif status_kerja == "SELECTING_PROCESS":
         st.subheader("🔍 Pilih Urutan Proses")
         data_pilihan = st.session_state.get('available_processes', [])
-        list_line = main_df['LINE'].unique().tolist() if 'LINE' in main_df.columns else []
+        list_line_db = main_df['LINE'].unique().tolist() if 'LINE' in main_df.columns else []
+        add_options = ["BM", "CM", "DM", "ERM", "NRM", "IRM", "KRM"]
+        list_line = list(dict.fromkeys(add_options + list_line_db))
+        
         if not any(p.get('URUTAN') == 'DPMR' for p in data_pilihan):
             sample_part_name = data_pilihan[0].get('Part_Name') if data_pilihan else "REPAIR"
             sample_part_no = data_pilihan[0].get('Part_No') if data_pilihan else "REPAIR"
