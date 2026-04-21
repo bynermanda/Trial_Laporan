@@ -74,6 +74,11 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+if st.sidebar.button("🔄 Update Data Master"):
+    st.cache_data.clear()
+    st.success("Data berhasil diperbarui!")
+    st.rerun()
+
 def get_waktu_wib():
     tz_jkt = pytz.timezone('Asia/Jakarta')
     return datetime.now(tz_jkt).replace(tzinfo=None)
@@ -527,8 +532,8 @@ else:
         data_pilihan = st.session_state.get('available_processes', [])
         list_line_db = main_df['LINE'].unique().tolist() if 'LINE' in main_df.columns else []
         add_options = ["BM", "CM", "DM", "ERM", "NRM", "IRM", "KRM"]
-        list_line = list(dict.fromkeys(list_line_db + add_options))
-        
+        list_line = list(dict.fromkeys(add_options + list_line_db))
+
         if not any(p.get('URUTAN') == 'DPMR' for p in data_pilihan):
             sample_part_name = data_pilihan[0].get('Part_Name') if data_pilihan else "REPAIR"
             sample_part_no = data_pilihan[0].get('Part_No') if data_pilihan else "REPAIR"
