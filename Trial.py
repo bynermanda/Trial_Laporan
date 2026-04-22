@@ -31,6 +31,11 @@ st.markdown("""
     .stApp {
         background-color: #261ad6;
     }
+    h2 {
+    font-size: 18px !important; /* Ukuran lebih kecil untuk HP */
+    font-family: 'Trebuchet MS', sans-serif !important;
+    color: #FFD700 !important; /* Contoh: Warna Gold agar kontras dengan Background Biru */
+    }
     
     /* Warna Sidebar */
     [data-testid="stSidebar"] {
@@ -71,7 +76,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # 3. Menampilkan Judul (Ini ditaruh DI LUAR st.markdown CSS)
-st.markdown("<h1 style='text-align: center; font-size: 30px; font-family: sans-serif;'>Laporan Produksi Dept. Press <br> PT Indosafety Sentosa</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; font-size: 32px; font-family: sans-serif;'>📟 Laporan Produksi Dept. Press <br> PT Indosafety Sentosa</h1>", unsafe_allow_html=True)
 
 if st.sidebar.button("🔄 Update Data Master"):
     st.cache_data.clear()
@@ -349,6 +354,8 @@ is_sudah_checkin = st.session_state.is_sudah_checkin
 
 
 # --- TAMPILAN UTAMA ---
+st.title("📟 Laporan Produksi Department Press PT Indosafety Sentosa")
+
 # LAYAR 1: BELUM SCAN NAMA
 if not nama_karyawan:
     st.subheader("👋 Selamat Datang! Silakan Scan ID Operator")
