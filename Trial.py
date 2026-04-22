@@ -31,11 +31,6 @@ st.markdown("""
     .stApp {
         background-color: #261ad6;
     }
-    h2 {
-    font-size: 18px !important; /* Ukuran lebih kecil untuk HP */
-    font-family: 'Trebuchet MS', sans-serif !important;
-    color: #FFD700 !important; /* Contoh: Warna Gold agar kontras dengan Background Biru */
-    }
     
     /* Warna Sidebar */
     [data-testid="stSidebar"] {
@@ -356,7 +351,7 @@ is_sudah_checkin = st.session_state.is_sudah_checkin
 # --- TAMPILAN UTAMA ---
 # LAYAR 1: BELUM SCAN NAMA
 if not nama_karyawan:
-    st.subheader("👋 Selamat Datang! Silakan Scan ID Operator")
+    st.subheader("<h2 style='font-size: 20px; font-family: sans-serif; font-weight: bold;'>👋 Selamat Datang! Silakan Scan ID Operator</h2>", unsafe_allow_html=True)
     barcode_id = qrcode_scanner(key='scanner_id_operator')
     
     if barcode_id:
@@ -578,15 +573,14 @@ else:
             durasi_live = waktu_sekarang.replace(tzinfo=None) - st.session_state.waktu_start.replace(tzinfo=None)
             menit_live = int(durasi_live.total_seconds() / 60)
             jam_live = round(durasi_live.total_seconds() / 3600, 2)
-            
+
             st.info(f"⚡ **Proses Berjalan:** {dp['part_name']} | {dp['part_no']}")
-            
+
             st.write("Konfirmasi Mulai Kerja")
-            btn_start = st.button("🚀 Konfirmasi Start Proses", use_container_width=True)
-    
+
             ### Bagian logika START proses ####
             if not st.session_state.get('sudah_start_diklik'):
-                if btn_start:
+                if st.button("🚀 Konfirmasi Start Proses", use_container_width=True):
                     data_start = {
                         "Tanggal": get_waktu_wib().strftime("%Y-%m-%d"),
                         "Nama": nama_karyawan,
@@ -610,7 +604,7 @@ else:
             else:
                 st.success("✅ Proses Sudah Dimulai")
                 st.info("JIKA DPMR MASUKAN JUMLAH PART OK DAN NG DI INPUT ABNORMAL!!!")
-    
+
             # Tampilan Metric
             col1, col2, col3, col4, col5 = st.columns(5)
             col1.metric("Urutan", dp['urutan_proses'])
@@ -618,25 +612,25 @@ else:
             col3.metric("Mulai", st.session_state.waktu_start.strftime('%H:%M:%S'))
             col4.metric("Sudah Berjalan", f"{menit_live} Menit", delta=f"{jam_live} Jam")
             col5.metric("Actual Line", dp.get('Actual_Line', ''))
-    
+
             st.divider()
-    
+
             # --- BAGIAN INPUT ABNORMAL SAAT RUNNING ---
             with st.expander("⚠️ INPUT ABNORMAL", expanded=False):
                 st.write("Input akan langsung tersimpan ke database. Jika DPMR tulis OK dan NG total di Keterangan.")
                 list_kode = ["A [Ganti Proses]", "B [Ganti/Tambah Coil]", "C [Perikasa ATA]", "D [Trial]", "E [2S]", "F [Briefing Rutin]", "G1 [Material NG dan Tukar Proses]",
                             "G2 [Kualitas NG dan Tukar Proses]", "H [Tooling]", "I [Mesin Abnormal]", "K1 [Penaganan Kualitas NG]", "K2 [Penanganan dies NG]", "L [Kekurangan Material]",
                             "M [Lain-Lain]", "N [No KANBAN Plan]", "O [DPMR]"]
-                
+
                 if "ab_counter" not in st.session_state:
                     st.session_state.ab_counter = 0
-    
+
                 c_kod, c_men, c_ket = st.columns([1, 1, 2])
                 k_sel = c_kod.selectbox("Kode", options=list_kode, key=f"ab_kode_run_{st.session_state.ab_counter}")
                 m_val = c_men.number_input("Menit", min_value=0, step=1, key=f"ab_menit_run_{st.session_state.ab_counter}")
                 kt_input = c_ket.text_input("Keterangan", placeholder="Contoh: Mesin Down", key=f"ab_ket_run_{st.session_state.ab_counter}")
                 kt_val = kt_input.upper()
-    
+
                 if st.button("🚀 Kirim Data Abnormal", use_container_width=True, key=f"btn_ab_submit_{st.session_state.ab_counter}"):
                     if not st.session_state.get('sudah_start_diklik'):
                         st.error("⚠️ Klik tombol START PROSES sebelum kirim data abnormal!")
@@ -664,15 +658,15 @@ else:
                         else:
                             st.error("Pilih Kode & Isi Menit!")
                             st.info("JIKA DPMR MASUKAN JUMLAH PART OK DAN NG DI INPUT ABNORMAL!!!")
-            
+
             st.divider()
-    
+
             st.subheader("SCAN KANBAN untuk FINISH")
             barcode_data = qrcode_scanner(key='scanner_finish_part')
             if barcode_data:
                 st.session_state.barcode_input = barcode_data
                 handle_scan()
-    
+
             st.divider()
             st.write("### ⌨️ Input KANBAN Manual")
             manual_finish = st.text_input("Ketik Part No", key="manual_part_finish_input").strip().upper()
