@@ -351,7 +351,7 @@ is_sudah_checkin = st.session_state.is_sudah_checkin
 # --- TAMPILAN UTAMA ---
 # LAYAR 1: BELUM SCAN NAMA
 if not nama_karyawan:
-    st.subheader("<h2 style='font-size: 20px; font-family: sans-serif; font-weight: bold;'>👋 Selamat Datang! Silakan Scan ID Operator</h2>", unsafe_allow_html=True)
+    st.subheader("👋 Selamat Datang! Silakan Scan ID Operator")
     barcode_id = qrcode_scanner(key='scanner_id_operator')
     
     if barcode_id:
