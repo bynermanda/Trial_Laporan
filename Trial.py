@@ -88,6 +88,28 @@ st.markdown(
     <h1 style='text-align: center; font-size: 28px; margin-top: -20px; margin-bottom: 0px; line-height: 1.2;'>
         📟 Laporan Produksi Dept. Press <br> PT Indosafety Sentosa
     </h1>
+    <div style="display: flex; justify-content: space-between; background-color: #1a1a2e; padding: 10px; border-radius: 10px; border: 1px solid #ffffff33;">
+    <div style="text-align: center;">
+        <p style="margin:0; font-size: 10px; color: #bbb;">Urutan</p>
+        <p style="margin:0; font-size: 16px; font-weight: bold;">{dp['urutan_proses']}</p>
+    </div>
+    <div style="text-align: center;">
+        <p style="margin:0; font-size: 10px; color: #bbb;">Target</p>
+        <p style="margin:0; font-size: 16px; font-weight: bold;">{dp['sec_pcs']}</p>
+    </div>
+    <div style="text-align: center;">
+        <p style="margin:0; font-size: 10px; color: #bbb;">Mulai</p>
+        <p style="margin:0; font-size: 16px; font-weight: bold;">{st.session_state.waktu_start.strftime('%H:%M')}</p>
+    </div>
+    <div style="text-align: center;">
+        <p style="margin:0; font-size: 10px; color: #bbb;">Durasi</p>
+        <p style="margin:0; font-size: 16px; font-weight: bold;">{menit_live}m</p>
+    </div>
+    <div style="text-align: center;">
+        <p style="margin:0; font-size: 10px; color: #bbb;">Line</p>
+        <p style="margin:0; font-size: 16px; font-weight: bold;">{dp.get('Actual_Line', '')}</p>
+    </div>
+</div>
     """, 
     unsafe_allow_html=True
 )
