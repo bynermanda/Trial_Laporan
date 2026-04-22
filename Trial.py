@@ -692,7 +692,7 @@ else:
 
             st.divider()
 
-            st.subheader("<span style='font-size: 18px; font-weight: bold;'>📸 SCAN KANBAN untuk FINISH</span>", unsafe_allow_html=True)
+            st.write("<span style='font-size: 18px; font-weight: bold;'>📸 SCAN KANBAN untuk FINISH</span>", unsafe_allow_html=True)
             barcode_data = qrcode_scanner(key='scanner_finish_part')
             if barcode_data:
                 st.session_state.barcode_input = barcode_data
