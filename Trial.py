@@ -580,7 +580,8 @@ else:
             menit_live = int(durasi_live.total_seconds() / 60)
             jam_live = round(durasi_live.total_seconds() / 3600, 2)
             st.info(f"⚡ **Proses Berjalan:** {dp['part_name']} | {dp['part_no']}")
-            btn_start = st.button("🚀 Kirim Data Abnormal", use_container_width=True, key=f"btn_ab_submit_{st.session_state.ab_counter}")
+            st.write("Konfirmasi Mulai Kerja")
+            btn_start = st.button("🚀 Konfirmasi Start Proses", use_container_width=True)
             
             col1, col2, col3, col4, col5 = st.columns(5)
             col1.metric("Urutan", dp['urutan_proses'])
@@ -607,7 +608,7 @@ else:
                 kt_input = c_ket.text_input("Keterangan", placeholder="Contoh: Mesin Down", key=f"ab_ket_run_{st.session_state.ab_counter}")
                 kt_val = kt_input.upper()
 
-                if btn_start:
+                if st.button("🚀 Kirim Data Abnormal", use_container_width=True, key=f"btn_ab_submit_{st.session_state.ab_counter}"):
                     if not st.session_state.get('sudah_start_diklik'):
                         st.error("⚠️ Klik tombol START PROSES sebelum kirim data abnormal!")
                     elif k_sel != "" and m_val > 0:
@@ -639,7 +640,7 @@ else:
 
             if not st.session_state.get('sudah_start_diklik'):
                 st.write("Konfirmasi Mulai Kerja")
-                if st.button("🚀 Konfirmasi Start Proses", use_container_width=True):
+                if btn_start:
                     data_start = {
                         "Tanggal": get_waktu_wib().strftime("%Y-%m-%d"),
                         "Nama": nama_karyawan,
