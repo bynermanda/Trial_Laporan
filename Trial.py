@@ -677,7 +677,7 @@ else:
                         uraian_abnormal = parts[1].replace("]", "") if len(parts) > 1 else ""
                         row_ab = {
                             "Tanggal": get_waktu_wib().strftime("%Y-%m-%d"),
-                            "Mesin": dp.get('line', ''),
+                            "Mesin": dp.get('Actual_Line', ''),
                             "Part_No": dp.get('part_no', ''),
                             "Model": dp.get('model', ''),
                             "Part_Name": dp.get('part_name', ''),
