@@ -27,6 +27,18 @@ components.html(
 # 2. Suntik CSS (Perhatikan perbaikan pada struktur kurung kurawal dan penghapusan tag H1 yang nyelip)
 st.markdown("""
     <style>
+    .block-container {
+        padding-top: 1.5rem !important;
+    }
+    header {
+        visibility: hidden;
+    }
+    h1 {
+        margin-top: -10px !important;
+        padding-top: 0px !important;
+        margin-bottom: 5px !important;
+        line-height: 1.1 !important;
+    }
     /* Warna Background Utama */
     .stApp {
         background-color: #261ad6;
@@ -71,7 +83,14 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # 3. Menampilkan Judul (Ini ditaruh DI LUAR st.markdown CSS)
-st.markdown("<h1 style='text-align: center; font-size: 30px; font-family: sans-serif;'>Laporan Produksi Dept. Press <br> PT Indosafety Sentosa</h1>", unsafe_allow_html=True)
+st.markdown(
+    """
+    <h1 style='text-align: center; font-size: 28px; margin-top: -20px; margin-bottom: 0px; line-height: 1.2;'>
+        📟 Laporan Produksi Dept. Press <br> PT Indosafety Sentosa
+    </h1>
+    """, 
+    unsafe_allow_html=True
+)
 
 if st.sidebar.button("🔄 Update Data Master"):
     st.cache_data.clear()
