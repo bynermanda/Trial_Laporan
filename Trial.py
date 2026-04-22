@@ -39,20 +39,6 @@ st.markdown("""
         margin-bottom: 5px !important;
         line-height: 1.1 !important;
     }
-            
-    [data-testid="column"] {
-        width: calc(20% - 1rem) !important; /* Karena kamu pakai 5 kolom, maka 100/5 = 20% */
-        flex: 1 1 calc(20% - 1rem) !important;
-        min-width: 50px !important; /* Mencegah kolom terlalu gepeng */
-    }
-
-    /* Mengecilkan font metric agar muat saat menyamping */
-    [data-testid="stMetricValue"] {
-        font-size: 16px !important; /* Ukuran angka metric */
-    }
-    [data-testid="stMetricLabel"] {
-        font-size: 10px !important; /* Ukuran teks judul metric */
-    }
     /* Warna Background Utama */
     .stApp {
         background-color: #261ad6;
