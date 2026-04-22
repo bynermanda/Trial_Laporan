@@ -354,8 +354,6 @@ is_sudah_checkin = st.session_state.is_sudah_checkin
 
 
 # --- TAMPILAN UTAMA ---
-st.title("📟 Laporan Produksi Department Press PT Indosafety Sentosa")
-
 # LAYAR 1: BELUM SCAN NAMA
 if not nama_karyawan:
     st.subheader("👋 Selamat Datang! Silakan Scan ID Operator")
