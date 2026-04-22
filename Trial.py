@@ -83,6 +83,13 @@ st.markdown("""
         font-weight: bold !important;
         font-size: 18px !important;
     }
+            /* Mengatur St.write (P) */
+    div.stMarkdown p {
+        font-size: 16px !important;
+        font-weight: normal !important;
+        line-height: 1.5 !important;
+        font-family: sans-serif !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -478,7 +485,7 @@ else:
     status_kerja = st.session_state.get('status_kerja', 'IDLE')
 
     if status_kerja == "IDLE":
-        st.write(" ### 📸 Opsi 1: Scan KANBAN untuk mulai proses")
+        st.write("<span style='font-size: 18px; font-weight: bold;'> ### 📸 Opsi 1: Scan KANBAN untuk mulai proses</span>", unsafe_allow_html=True)
         barcode_part = qrcode_scanner(key='scanner_part_prod')
         if barcode_part:
             st.session_state.barcode_input = barcode_part
