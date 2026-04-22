@@ -97,7 +97,7 @@ st.markdown("""
     }
     /* 1. Popover Button (Tombol Selesai Shift) tetap Hitam */
     div[data-testid="stPopover"] > button {
-        background-color: black !important;
+        background-color: lightblue !important;
         color: white !important;
         border: 1px solid #ffffff !important;
     }
