@@ -15,7 +15,6 @@ components.html(
     """
     <script>
     window.parent.addEventListener('beforeunload', function (e) {
-        // Pesan standar browser (beberapa browser modern mungkin tidak menampilkan teks kustom)
         var confirmationMessage = 'Data sedang diproses. Jika refresh, sesi scan akan hilang!';
         (e || window.event).returnValue = confirmationMessage;
         return confirmationMessage;
@@ -25,58 +24,54 @@ components.html(
     height=0,
 )
 
-# Suntik CSS untuk warna
+# 2. Suntik CSS (Perhatikan perbaikan pada struktur kurung kurawal dan penghapusan tag H1 yang nyelip)
 st.markdown("""
     <style>
-    /* 1. Warna Background Utama */
+    /* Warna Background Utama */
     .stApp {
         background-color: #261ad6;
     }
-    <h1 style='text-align: center; font-size: 32px; color: #1E3A8A; font-family: sans-serif;'>
-        📟 Laporan Produksi Dept. Press <br> PT Indosafety Sentosa
-    </h1>
-    }
     
-    /* 2. Warna Sidebar */
+    /* Warna Sidebar */
     [data-testid="stSidebar"] {
-        background-color: #ff0909;
+        background-color: #b30000;
     }
 
-    /* 3. Warna Semua Teks */
-    h1, h2, h3, p, span, label {
+    /* Warna Semua Teks agar Putih */
+    h1, h2, h3, p, span, label, .stMarkdown {
         color: #ffffff !important;
     }
+
+    /* Tombol Umum (Hijau) */
     div.stButton > button {
         background-color: #00FF00 !important;
         color: black !important;
         border-radius: 10px;
+        font-weight: bold !important;
     }
-    div.stButton > button[kind="secondary"][key="btn_reset_biru"],
+
+    /* Khusus Tombol Reset (Merah) menggunakan Key */
     div.stButton > button[key="btn_reset_biru"] {
         background: linear-gradient(45deg, #FF4444, #CC0000) !important;
         color: white !important;
         border: 2px solid #990000 !important;
         border-radius: 8px !important;
-        font-weight: bold !important;
-        transition: all 0.3s ease !important;
     }
-    div.stButton > button[kind="secondary"][key="btn_reset_biru"]:hover,
-    div.stButton > button[key="btn_reset_biru"]:hover {
-        background: linear-gradient(45deg, #CC0000, #990000) !important;
-        color: white !important;
-        transform: scale(1.05) !important;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.3) !important;
-    }
-    div.stButton > button[kind="secondary"][key="btn_reset_biru"]:active,
-    div.stButton > button[key="btn_reset_biru"]:active {
-        background: #990000 !important;
-        transform: scale(0.98) !important;
-    }
+    
+    /* Memastikan teks di dalam tombol tetap hitam (kecuali tombol reset) */
     div.stButton > button p {
-        color: #000000 !important;
-        font-weight: bold !important;
+        color: black !important;
+    }
+    
+    /* Warna teks di dalam tombol reset agar tetap putih */
+    div.stButton > button[key="btn_reset_biru"] p {
+        color: white !important;
+    }
     </style>
     """, unsafe_allow_html=True)
+
+# 3. Menampilkan Judul (Ini ditaruh DI LUAR st.markdown CSS)
+st.markdown("<h1 style='text-align: center; font-size: 32px; font-family: sans-serif;'>📟 Laporan Produksi Dept. Press <br> PT Indosafety Sentosa</h1>", unsafe_allow_html=True)
 
 if st.sidebar.button("🔄 Update Data Master"):
     st.cache_data.clear()
