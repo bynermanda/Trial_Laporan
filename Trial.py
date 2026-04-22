@@ -412,7 +412,7 @@ is_sudah_checkin = st.session_state.is_sudah_checkin
 # LAYAR 1: BELUM SCAN NAMA
 if not nama_karyawan:
     st.subheader("👋 Selamat Datang! Silakan Scan ID Operator")
-    st.warning("⚠️INI LINK TRIAL, GUNAKAN LINK https://laporanappuksi-dhyhtpuvw7gcm9qf8hvbt4.streamlit.app/ UNTUK AKSES PENUH)
+    st.warning("⚠️INI LINK TRIAL, GUNAKAN LINK https://laporanappuksi-dhyhtpuvw7gcm9qf8hvbt4.streamlit.app/ UNTUK AKSES PENUH")
     barcode_id = qrcode_scanner(key='scanner_id_operator')
     
     if barcode_id:
