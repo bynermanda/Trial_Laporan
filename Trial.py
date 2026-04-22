@@ -95,6 +95,37 @@ st.markdown("""
         margin-bottom: 0.5rem !important; /* Jarak bawah */
         border-bottom: 1px solid rgba(255, 255, 255, 0.3) !important; /* Warna garis tipis */
     }
+    /* 1. Popover Button (Tombol Selesai Shift) tetap Hitam */
+    div[data-testid="stPopover"] > button {
+        background-color: #000000 !important;
+        color: #ffffff !important;
+        border: 1px solid #ffffff !important;
+    }
+    /* 2. Text Input agar background tetap Putih & teks tetap Hitam */
+    /* Ini agar saat mode Dark, input tidak jadi gelap yang sulit dibaca */
+    div[data-testid="stTextInput"] input {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important; /* Untuk Chrome/Safari Mobile */
+    }
+
+    /* 3. Paksa Number Input juga tetap Putih */
+    div[data-testid="stNumberInput"] input {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+    }
+
+    /* 4. Paksa Selectbox agar tetap Putih */
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+    }
+    
+    /* 5. Menghilangkan Border biru saat input diklik (fokus) */
+    div[data-testid="stTextInput"] input:focus {
+        border-color: #ffffff !important;
+        box-shadow: none !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
