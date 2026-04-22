@@ -95,33 +95,6 @@ st.markdown("""
         margin-bottom: 0.5rem !important; /* Jarak bawah */
         border-bottom: 1px solid rgba(255, 255, 255, 0.3) !important; /* Warna garis tipis */
     }
-    /* 1. Kunci Tombol Popover (Luar) */
-    div[data-testid="stPopover"] > button {
-        background-color: #000000 !important; /* Paksa Hitam */
-        color: #ffffff !important;           /* Paksa Teks Putih */
-        border: 1px solid #ffffff !important;
-        opacity: 1 !important;
-    }
-
-    /* 2. Kunci Teks di Dalam Popover (Paling Penting!) */
-    /* Ini untuk melawan aturan global h1, h2, p, span yang kamu buat di atas */
-    div[data-testid="stPopover"] [data-testid="stMarkdownContainer"] p,
-    div[data-testid="stPopover"] span,
-    div[data-testid="stPopover"] p {
-        color: #ffffff !important;
-        -webkit-text-fill-color: #ffffff !important;
-        font-weight: bold !important;
-        font-size: 16px !important;
-    }
-
-    /* 3. Kunci saat Hover/Klik agar tidak jadi Putih */
-    div[data-testid="stPopover"] > button:hover, 
-    div[data-testid="stPopover"] > button:active,
-    div[data-testid="stPopover"] > button:focus {
-        background-color: #1a1a1a !important; /* Tetap Hitam (agak terang sedikit) */
-        border-color: #00FF00 !important;     /* Beri border hijau saat fokus agar tahu sedang diklik */
-        color: #ffffff !important;
-    }
     /* 2. Text Input agar background tetap Putih & teks tetap Hitam */
     div[data-testid="stTextInput"] input {
         background-color: #000000 !important;
