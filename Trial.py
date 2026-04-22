@@ -72,12 +72,16 @@ st.markdown("""
     
     /* Memastikan teks di dalam tombol tetap hitam (kecuali tombol reset) */
     div.stButton > button p {
+        font-size: 18px !important; 
+        font-weight: bold !important;
         color: black !important;
     }
     
     /* Warna teks di dalam tombol reset agar tetap putih */
     div.stButton > button[key="btn_reset_biru"] p {
         color: white !important;
+        font-weight: bold !important;
+        font-size: 18px !important;
     }
     </style>
     """, unsafe_allow_html=True)
