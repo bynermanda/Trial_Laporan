@@ -630,7 +630,7 @@ else:
                 st.info("JIKA DPMR MASUKAN JUMLAH PART OK DAN NG DI INPUT ABNORMAL!!!")
 
             # Tampilan Metric
-            col1, col2, col3, col4, col5 = st.columns(5)
+            col1, col2, col3, col4, col5 = st.columns(5, gap="small")
             col1.metric("Urutan", dp['urutan_proses'])
             col2.metric("Target Sec/Pcs", dp['sec_pcs'])
             col3.metric("Mulai", st.session_state.waktu_start.strftime('%H:%M:%S'))
@@ -766,7 +766,7 @@ else:
                 st.divider()
                 st.subheader("📊 Ringkasan Hasil Produksi")
                 
-                c1, c2, c3 = st.columns(3)
+                c1, c2, c3 = st.columns(3, gap="medium")
                 c1.metric("Persentase Produksi", f"{persen_prod:.2f} %")
                 c2.metric("Total Jam Kerja", f"{round(durasi_bersih/60, 2)} Jam")
                 c3.metric("Rasio NG", f"{(ng/act * 100) if act > 0 else 0:.2f} %")
