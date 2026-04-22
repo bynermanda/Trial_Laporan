@@ -90,6 +90,11 @@ st.markdown("""
         line-height: 1.5 !important;
         font-family: sans-serif !important;
     }
+    hr {
+        margin-top: 0.5rem !important;   /* Jarak atas (defaultnya besar) */
+        margin-bottom: 0.5rem !important; /* Jarak bawah */
+        border-bottom: 1px solid rgba(255, 255, 255, 0.3) !important; /* Warna garis tipis */
+    }
     </style>
     """, unsafe_allow_html=True)
 
