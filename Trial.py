@@ -558,7 +558,7 @@ else:
         
         st.divider()
         st.write("Jika sudah selesai semua pekerjaan shift ini:")
-        with st.popover("🔴 SELESAI SHIFT (CHECK-OUT)", use_container_width=True, unsafe_allow_html=True):
+        with st.popover("🔴 SELESAI SHIFT (CHECK-OUT)", use_container_width=True):
             st.write("### Konfirmasi Check-Out")
             st.warning("Apakah Anda yakin ingin mengakhiri shift sekarang?")
 
