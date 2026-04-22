@@ -32,6 +32,10 @@ st.markdown("""
     .stApp {
         background-color: #261ad6;
     }
+    <h1 style='text-align: center; font-size: 32px; color: #1E3A8A; font-family: sans-serif;'>
+        📟 Laporan Produksi Dept. Press <br> PT Indosafety Sentosa
+    </h1>
+    }
     
     /* 2. Warna Sidebar */
     [data-testid="stSidebar"] {
@@ -532,7 +536,7 @@ else:
         data_pilihan = st.session_state.get('available_processes', [])
         list_line_db = main_df['LINE'].unique().tolist() if 'LINE' in main_df.columns else []
         add_options = ["BM", "CM", "DM", "ERM", "NRM", "IRM", "KRM"]
-        list_line = list(dict.fromkeys(add_options + list_line_db))
+        list_line = list(dict.fromkeys(list_line_db + add_options))
 
         if not any(p.get('URUTAN') == 'DPMR' for p in data_pilihan):
             sample_part_name = data_pilihan[0].get('Part_Name') if data_pilihan else "REPAIR"
