@@ -635,6 +635,7 @@ else:
                     if simpan_ke_sheet(data_start, "START"):
                         st.session_state.sudah_start_diklik = True
                         st.balloons()
+                        time.sleep(2)
                         st.success("✅ Produksi Dimulai!")
                         st.rerun()
             else:
