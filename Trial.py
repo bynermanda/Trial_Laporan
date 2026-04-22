@@ -573,113 +573,113 @@ else:
 
     elif status_kerja == "RUNNING":
         dp = st.session_state.get('current_part')
+    if dp:
+        waktu_sekarang = get_waktu_wib()
+        durasi_live = waktu_sekarang.replace(tzinfo=None) - st.session_state.waktu_start.replace(tzinfo=None)
+        menit_live = int(durasi_live.total_seconds() / 60)
+        jam_live = round(durasi_live.total_seconds() / 3600, 2)
         
-        if dp:
-            waktu_sekarang = get_waktu_wib()
-            durasi_live = waktu_sekarang.replace(tzinfo=None) - st.session_state.waktu_start.replace(tzinfo=None)
-            menit_live = int(durasi_live.total_seconds() / 60)
-            jam_live = round(durasi_live.total_seconds() / 3600, 2)
-            st.info(f"⚡ **Proses Berjalan:** {dp['part_name']} | {dp['part_no']}")
-            st.write("Konfirmasi Mulai Kerja")
-            btn_start = st.button("🚀 Konfirmasi Start Proses", use_container_width=True)
+        st.info(f"⚡ **Proses Berjalan:** {dp['part_name']} | {dp['part_no']}")
+        
+        st.write("Konfirmasi Mulai Kerja")
+        btn_start = st.button("🚀 Konfirmasi Start Proses", use_container_width=True)
+
+        ### Bagian logika START proses ####
+        if not st.session_state.get('sudah_start_diklik'):
+            if btn_start:
+                data_start = {
+                    "Tanggal": get_waktu_wib().strftime("%Y-%m-%d"),
+                    "Nama": nama_karyawan,
+                    "NIK": f"'{st.session_state.get('nik_karyawan', '-')}",
+                    "Part_No": dp['part_no'],
+                    "Part_Name": dp['part_name'],
+                    "Model": dp['model'],
+                    "Line": dp['line'],
+                    "Urutan_Proses": dp['urutan_proses'],
+                    "Actual_Line": dp.get('Actual_Line', ""),
+                    "Sec_Pcs": dp['sec_pcs'],
+                    "Waktu_Mulai": st.session_state.waktu_start.strftime("%H:%M:%S"),
+                    "Waktu_Selesai": "",
+                    "ACT": 0, "NG": 0, "Status": "START"
+                }
+                if simpan_ke_sheet(data_start, "START"):
+                    st.session_state.sudah_start_diklik = True
+                    st.balloons()
+                    st.success("✅ Produksi Dimulai!")
+                    st.rerun()
+        else:
+            st.success("✅ Proses Sudah Dimulai")
+            st.info("JIKA DPMR MASUKAN JUMLAH PART OK DAN NG DI INPUT ABNORMAL!!!")
+
+        # Tampilan Metric
+        col1, col2, col3, col4, col5 = st.columns(5)
+        col1.metric("Urutan", dp['urutan_proses'])
+        col2.metric("Target Sec/Pcs", dp['sec_pcs'])
+        col3.metric("Mulai", st.session_state.waktu_start.strftime('%H:%M:%S'))
+        col4.metric("Sudah Berjalan", f"{menit_live} Menit", delta=f"{jam_live} Jam")
+        col5.metric("Actual Line", dp.get('Actual_Line', ''))
+
+        st.divider()
+
+        # --- BAGIAN INPUT ABNORMAL SAAT RUNNING ---
+        with st.expander("⚠️ INPUT ABNORMAL", expanded=False):
+            st.write("Input akan langsung tersimpan ke database. Jika DPMR tulis OK dan NG total di Keterangan.")
+            list_kode = ["A [Ganti Proses]", "B [Ganti/Tambah Coil]", "C [Perikasa ATA]", "D [Trial]", "E [2S]", "F [Briefing Rutin]", "G1 [Material NG dan Tukar Proses]",
+                        "G2 [Kualitas NG dan Tukar Proses]", "H [Tooling]", "I [Mesin Abnormal]", "K1 [Penaganan Kualitas NG]", "K2 [Penanganan dies NG]", "L [Kekurangan Material]",
+                        "M [Lain-Lain]", "N [No KANBAN Plan]", "O [DPMR]"]
             
-            col1, col2, col3, col4, col5 = st.columns(5)
-            col1.metric("Urutan", dp['urutan_proses'])
-            col2.metric("Target Sec/Pcs", dp['sec_pcs'])
-            col3.metric("Mulai", st.session_state.waktu_start.strftime('%H:%M:%S'))
-            col4.metric("Sudah Berjalan", f"{menit_live} Menit", delta=f"{jam_live} Jam")
-            col5.metric("Actual Line", dp.get('Actual_Line', ''))
+            if "ab_counter" not in st.session_state:
+                st.session_state.ab_counter = 0
 
-            st.divider()
+            c_kod, c_men, c_ket = st.columns([1, 1, 2])
+            k_sel = c_kod.selectbox("Kode", options=list_kode, key=f"ab_kode_run_{st.session_state.ab_counter}")
+            m_val = c_men.number_input("Menit", min_value=0, step=1, key=f"ab_menit_run_{st.session_state.ab_counter}")
+            kt_input = c_ket.text_input("Keterangan", placeholder="Contoh: Mesin Down", key=f"ab_ket_run_{st.session_state.ab_counter}")
+            kt_val = kt_input.upper()
 
-            # --- BAGIAN BARU: INPUT ABNORMAL SAAT RUNNING ---
-            with st.expander("⚠️ INPUT ABNORMAL", expanded=False):
-                st.write("Input akan langsung tersimpan ke database. Jika DPMR tulis OK dan NG total di Keterangan.")
-                list_kode = ["A [Ganti Proses]", "B [Ganti/Tambah Coil]", "C [Perikasa ATA]", "D [Trial]", "E [2S]", "F [Briefing Rutin]", "G1 [Material NG dan Tukar Proses]",
-                            "G2 [Kualitas NG dan Tukar Proses]", "H [Tooling]", "I [Mesin Abnormal]", "K1 [Penaganan Kualitas NG]", "K2 [Penanganan dies NG]", "L [Kekurangan Material]",
-                            "M [Lain-Lain]", "N [No KANBAN Plan]", "O [DPMR]"]
-                
-                if "ab_counter" not in st.session_state:
-                    st.session_state.ab_counter = 0
-
-                c_kod, c_men, c_ket = st.columns([1, 1, 2])
-                k_sel = c_kod.selectbox("Kode", options=list_kode, key=f"ab_kode_run_{st.session_state.ab_counter}")
-                m_val = c_men.number_input("Menit", min_value=0, step=1, key=f"ab_menit_run_{st.session_state.ab_counter}")
-                kt_input = c_ket.text_input("Keterangan", placeholder="Contoh: Mesin Down", key=f"ab_ket_run_{st.session_state.ab_counter}")
-                kt_val = kt_input.upper()
-
-                if st.button("🚀 Kirim Data Abnormal", use_container_width=True, key=f"btn_ab_submit_{st.session_state.ab_counter}"):
-                    if not st.session_state.get('sudah_start_diklik'):
-                        st.error("⚠️ Klik tombol START PROSES sebelum kirim data abnormal!")
-                    elif k_sel != "" and m_val > 0:
-                        parts = k_sel.split(" [")
-                        kode_hanya = parts[0]
-                        uraian_abnormal = parts[1].replace("]", "") if len(parts) > 1 else ""
-                        row_ab = {
-                            "Tanggal": get_waktu_wib().strftime("%Y-%m-%d"),
-                            "Mesin": dp.get('line', ''),
-                            "Part_No": dp.get('part_no', ''),
-                            "Model": dp.get('model', ''),
-                            "Part_Name": dp.get('part_name', ''),
-                            "Urutan_Proses": dp.get('urutan_proses', ''),
-                            "Operator": nama_karyawan,
-                            "Kode_Abnormal": kode_hanya,      
-                            "Uraian_Abnormal": uraian_abnormal,
-                            "Total_Waktu": m_val,
-                            "Keterangan": kt_val
-                        }
-                        if simpan_ke_sheet(row_ab, "ABNORMAL"):
-                            st.toast(f"✅ Kode {k_sel} tersimpan!")
-                            st.session_state.ab_counter += 1
-                            time.sleep(1)
-                        else:
-                            st.error("Pilih Kode & Isi Menit!")
-                            st.info("JIKA DPMR MASUKAN JUMLAH PART OK DAN NG DI INPUT ABNORMAL!!!")
-
-            st.divider()
-
-            if not st.session_state.get('sudah_start_diklik'):
-                st.write("Konfirmasi Mulai Kerja")
-                if btn_start:
-                    data_start = {
+            if st.button("🚀 Kirim Data Abnormal", use_container_width=True, key=f"btn_ab_submit_{st.session_state.ab_counter}"):
+                if not st.session_state.get('sudah_start_diklik'):
+                    st.error("⚠️ Klik tombol START PROSES sebelum kirim data abnormal!")
+                elif k_sel != "" and m_val > 0:
+                    parts = k_sel.split(" [")
+                    kode_hanya = parts[0]
+                    uraian_abnormal = parts[1].replace("]", "") if len(parts) > 1 else ""
+                    row_ab = {
                         "Tanggal": get_waktu_wib().strftime("%Y-%m-%d"),
-                        "Nama": nama_karyawan,
-                        "NIK": f"'{st.session_state.get('nik_karyawan', '-')}",
-                        "Part_No": dp['part_no'],
-                        "Part_Name": dp['part_name'],
-                        "Model": dp['model'],
-                        "Line": dp['line'],
-                        "Urutan_Proses": dp['urutan_proses'],
-                        "Actual_Line": dp.get('Actual_Line', ""),
-                        "Sec_Pcs": dp['sec_pcs'],
-                        "Waktu_Mulai": st.session_state.waktu_start.strftime("%H:%M:%S"),
-                        "Waktu_Selesai": "",
-                        "ACT": 0, "NG": 0, "Status": "START"
+                        "Mesin": dp.get('line', ''),
+                        "Part_No": dp.get('part_no', ''),
+                        "Model": dp.get('model', ''),
+                        "Part_Name": dp.get('part_name', ''),
+                        "Urutan_Proses": dp.get('urutan_proses', ''),
+                        "Operator": nama_karyawan,
+                        "Kode_Abnormal": kode_hanya,      
+                        "Uraian_Abnormal": uraian_abnormal,
+                        "Total_Waktu": m_val,
+                        "Keterangan": kt_val
                     }
-                    if simpan_ke_sheet(data_start, "START"):
-                        st.session_state.sudah_start_diklik = True
-                        st.balloons()
-                        st.success("✅ Produksi Dimulai!")
-                        st.rerun()
-            else:
-                st.success("✅ Proses Sudah Dimulai")
-                st.info("JIKA DPMR MASUKAN JUMLAH PART OK DAN NG DI INPUT ABNORMAL!!!")
+                    if simpan_ke_sheet(row_ab, "ABNORMAL"):
+                        st.toast(f"✅ Kode {k_sel} tersimpan!")
+                        st.session_state.ab_counter += 1
+                        time.sleep(1)
+                    else:
+                        st.error("Pilih Kode & Isi Menit!")
+                        st.info("JIKA DPMR MASUKAN JUMLAH PART OK DAN NG DI INPUT ABNORMAL!!!")
+        
+        st.divider()
 
-            st.divider()
+        st.subheader("SCAN KANBAN untuk FINISH")
+        barcode_data = qrcode_scanner(key='scanner_finish_part')
+        if barcode_data:
+            st.session_state.barcode_input = barcode_data
+            handle_scan()
 
-            st.subheader("SCAN KANBAN untuk FINISH")
-            barcode_data = qrcode_scanner(key='scanner_finish_part')
-            if barcode_data:
-                st.session_state.barcode_input = barcode_data
+        st.divider()
+        st.write("### ⌨️ Input KANBAN Manual")
+        manual_finish = st.text_input("Ketik Part No", key="manual_part_finish_input").strip().upper()
+        if st.button("✅ Konfirmasi Input Manual Finish", use_container_width=True):
+            if manual_finish:
+                st.session_state.barcode_input = manual_finish
                 handle_scan()
-
-            st.divider()
-            st.write("### ⌨️ Input KANBAN Manual")
-            manual_finish = st.text_input("Ketik Part No", key="manual_part_finish_input").strip().upper()
-            if st.button("✅ Konfirmasi Input Manual Finish", use_container_width=True):
-                if manual_finish:
-                    st.session_state.barcode_input = manual_finish
-                    handle_scan()
 
     elif status_kerja == "FINISHING":
         dp = st.session_state.get('current_part')
