@@ -485,7 +485,7 @@ else:
     status_kerja = st.session_state.get('status_kerja', 'IDLE')
 
     if status_kerja == "IDLE":
-        st.write("<span style='font-size: 18px; font-weight: bold;'> ### 📸 Opsi 1: Scan KANBAN untuk mulai proses</span>", unsafe_allow_html=True)
+        st.write("<span style='font-size: 18px; font-weight: bold;'> 📸 Opsi 1: Scan KANBAN untuk mulai proses</span>", unsafe_allow_html=True)
         barcode_part = qrcode_scanner(key='scanner_part_prod')
         if barcode_part:
             st.session_state.barcode_input = barcode_part
@@ -493,7 +493,7 @@ else:
 
         st.divider()
 
-        st.write("### ⌨️ Opsi 2: Input  Part No. Manual")
+        st.write("<span style='font-size: 18px; font-weight: bold;'> ⌨️ Opsi 2: Input  Part No. Manual</span>", unsafe_allow_html=True)
         manual_input = st.text_input("Ketik Part No.", key="manual_part_input").strip().upper()
         if st.button("✅ Konfirmasi Input Manual", use_container_width=True):
             if manual_input:
@@ -692,14 +692,14 @@ else:
 
             st.divider()
 
-            st.subheader("SCAN KANBAN untuk FINISH")
+            st.subheader("<span style='font-size: 18px; font-weight: bold;'>📸 SCAN KANBAN untuk FINISH</span>", unsafe_allow_html=True)
             barcode_data = qrcode_scanner(key='scanner_finish_part')
             if barcode_data:
                 st.session_state.barcode_input = barcode_data
                 handle_scan()
 
             st.divider()
-            st.write("### ⌨️ Input KANBAN Manual")
+            st.write("<span style='font-size: 18px; font-weight: bold;'>⌨️ Input KANBAN Manual</span>", unsafe_allow_html=True)
             manual_finish = st.text_input("Ketik Part No", key="manual_part_finish_input").strip().upper()
             if st.button("✅ Konfirmasi Input Manual Finish", use_container_width=True):
                 if manual_finish:
