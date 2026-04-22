@@ -71,7 +71,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # 3. Menampilkan Judul (Ini ditaruh DI LUAR st.markdown CSS)
-st.markdown("<h1 style='text-align: center; font-size: 32px; font-family: sans-serif;'>📟 Laporan Produksi Dept. Press <br> PT Indosafety Sentosa</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; font-size: 30px; font-family: sans-serif;'>Laporan Produksi Dept. Press <br> PT Indosafety Sentosa</h1>", unsafe_allow_html=True)
 
 if st.sidebar.button("🔄 Update Data Master"):
     st.cache_data.clear()
