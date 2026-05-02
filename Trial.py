@@ -823,8 +823,8 @@ else:
 
             # Tombol START — hanya muncul jika belum diklik
             if not st.session_state.get('sudah_start_diklik'):
+                st.warning("⚠️ Anda belum mengkonfirmasi START PROSES. Klik tombol di bawah untuk mulai menghitung waktu produksi.")
                 if st.button("🚀 Konfirmasi Start Proses", use_container_width=True):
-                    st.info("⏳ anda belum Klik START PROSES, klik untuk menyimpan data START ke database.")
                     data_start = {
                         "Tanggal":       get_waktu_wib().strftime("%Y-%m-%d"),
                         "Nama":          nama_karyawan,
