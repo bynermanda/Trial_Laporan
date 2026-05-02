@@ -824,6 +824,7 @@ else:
             # Tombol START — hanya muncul jika belum diklik
             if not st.session_state.get('sudah_start_diklik'):
                 if st.button("🚀 Konfirmasi Start Proses", use_container_width=True):
+                    st.info("⏳ anda belum Klik START PROSES, klik untuk menyimpan data START ke database.")
                     data_start = {
                         "Tanggal":       get_waktu_wib().strftime("%Y-%m-%d"),
                         "Nama":          nama_karyawan,
@@ -849,7 +850,8 @@ else:
                         st.rerun()
             else:
                 st.success("✅ Proses Sudah Dimulai")
-                st.info("JIKA DPMR: Masukkan jumlah Part OK dan NG di INPUT ABNORMAL!" + "\n" + "DATA START ANDA SUDAH TERSIMPAN DI DATABASE. // ")
+                st.info("JIKA DPMR: Masukkan jumlah Part OK dan NG di INPUT ABNORMAL!")
+                st.info("DATA START ANDA SUDAH TERSIMPAN DI DATABASE.")
 
             # Metric cards
             col1, col2, col3, col4, col5 = st.columns(5, gap="small")
