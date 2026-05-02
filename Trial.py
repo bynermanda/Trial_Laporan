@@ -314,7 +314,7 @@ def simpan_ke_sheet(data_dict, tipe):
             df_proses = read_proses_sheet(URL_KITA).copy()
 
             # Konversi kolom angka ke object agar bisa diisi string/float campuran
-            kolom_angka = ['Total_Jam', 'Rasio_NG', '%_Prod', 'ACT', 'NG']
+            kolom_angka = ['Total_Jam', 'Rasio_NG', '%_Prod', 'ACT']
             for col in kolom_angka:
                 if col in df_proses.columns:
                     df_proses[col] = df_proses[col].astype(object)
@@ -832,7 +832,7 @@ else:
                         "Part_Name":     dp['part_name'],
                         "Model":         dp['model'],
                         "Line":          dp['line'],
-                        "Urutan_Proses": dp['urutan_proses'],
+                        "Urutan_Proses": f"'{dp['urutan_proses']}",
                         "Actual_Line":   dp.get('Actual_Line', ""),
                         "Sec_Pcs":       dp['sec_pcs'],
                         "Waktu_Mulai":   st.session_state.waktu_start.strftime("%H:%M:%S"),
@@ -849,7 +849,9 @@ else:
                         st.rerun()
             else:
                 st.success("✅ Proses Sudah Dimulai")
-                st.info("JIKA DPMR: Masukkan jumlah Part OK dan NG di INPUT ABNORMAL!")
+                st.info("JIKA DPMR: Masukkan jumlah Part OK dan NG di INPUT ABNORMAL!" \
+                "" \
+                "DATA START ANDA SUDAH TERSIMPAN DI DATABASE.")
 
             # Metric cards
             col1, col2, col3, col4, col5 = st.columns(5, gap="small")
@@ -956,11 +958,12 @@ else:
 
             st.write("### ☕ Potongan Waktu Istirahat")
             DAFTAR_BREAK = {
-                "Break 1 (10m)":      10,
-                "Break 2 (10m)":      10,
-                "Istirahat (40m)":    40,
-                "Extra Break (15m)":  15,
-                "2S (15m)":           15
+                "Break 1 (10m)":            10,
+                "Break 2 (10m)":            10,
+                "Istirahat (40m)":          40,
+                "Extra Break (15m)":        15,
+                "2S (15m)":                 15,
+                "Istirahat Jumat (70m)":    70
             }
             pilihan_break  = st.multiselect("Pilih:", options=list(DAFTAR_BREAK.keys()))
             extra_custom   = st.number_input("Lainnya (Menit)", min_value=0, step=1, value=0)
