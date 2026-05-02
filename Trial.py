@@ -849,9 +849,7 @@ else:
                         st.rerun()
             else:
                 st.success("✅ Proses Sudah Dimulai")
-                st.info("JIKA DPMR: Masukkan jumlah Part OK dan NG di INPUT ABNORMAL!" \
-                "" \
-                "DATA START ANDA SUDAH TERSIMPAN DI DATABASE.")
+                st.info("JIKA DPMR: Masukkan jumlah Part OK dan NG di INPUT ABNORMAL!" + "\n" + "DATA START ANDA SUDAH TERSIMPAN DI DATABASE. // ")
 
             # Metric cards
             col1, col2, col3, col4, col5 = st.columns(5, gap="small")
@@ -993,6 +991,7 @@ else:
                     if simpan_ke_sheet(data_finish, "FINISH"):
                         st.session_state.data_sph_terkirim = True
                         st.success("✅ SPH Terkirim!")
+                        st.info("Data SPH sudah tersimpan, Scroll ke bawah untuk scan part baru atau reset scanner.")
                 else:
                     st.error("⚠️ Jumlah ACT harus diisi dan lebih dari 0!")
 
