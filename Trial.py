@@ -474,8 +474,6 @@ def handle_scan():
             st.error(f"❌ Barcode ({part_no_scanned}) berbeda dengan Part aktif: {current_p_no}")
             st.session_state.barcode_input = ""
 
-    st.session_state.barcode_input = ""
-
 
 # ============================================================
 # LOGIKA UTAMA — baca session state
@@ -495,15 +493,14 @@ if nama_karyawan and not st.session_state.is_sudah_checkin:
             st.session_state.data_waktu_kerja = pd.DataFrame()
 
     df_cek = st.session_state.data_waktu_kerja
-
     if not df_cek.empty:
-        # FIX 5: exact match NIK, bukan str.contains — hindari false positive
         nik_clean = str(nik_karyawan).replace("'", "").replace(".", "").strip()
         checkin_found = df_cek[
             (df_cek['NIK'].astype(str).str.replace("'", "").str.replace(".", "").str.strip() == nik_clean) &
             (df_cek['Check-Out'].isna() | (df_cek['Check-Out'].astype(str).str.strip() == ""))
         ]
-        st.session_state.is_sudah_checkin = not checkin_found.empty
+        if not checkin_found.empty:
+            st.session_state.is_sudah_checkin = True
 
 is_sudah_checkin = st.session_state.is_sudah_checkin
 
@@ -531,6 +528,10 @@ if not nama_karyawan:
 
                 if 'data_waktu_kerja' in st.session_state:
                     del st.session_state.data_waktu_kerja
+
+                for key_lama in ['current_part', 'sudah_start_diklik', 'proses_data',
+                  'available_processes', 'ab_counter', 'data_sph_terkirim']:
+                    st.session_state.pop(key_lama, None)
 
                 with st.spinner("Mengecek status kerja terakhir..."):
                     data_aktif = cek_proses_aktif(raw_nik)
@@ -850,8 +851,8 @@ else:
                         st.rerun()
             else:
                 st.success("✅ Proses Sudah Dimulai")
-                st.info("JIKA DPMR: Masukkan jumlah Part OK dan NG di INPUT ABNORMAL!")
-                st.info("DATA START ANDA SUDAH TERSIMPAN DI DATABASE.")
+                st.info("⚠️ Input ABNORNAL di bawah dan scan KANBAN FINISH untuk akhiri proses.")
+                st.info("DATA START ANDA SUDAH TERSIMPAN DI DATABASE. SELAMAT BEKERJA! 🙌")
 
             # Metric cards
             col1, col2, col3, col4, col5 = st.columns(5, gap="small")
