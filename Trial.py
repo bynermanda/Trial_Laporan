@@ -734,35 +734,47 @@ if not nama_karyawan:
 
     barcode_id = qrcode_scanner(key='scanner_id_operator')
 
-    if barcode_id and isinstance(barcode_id, str):
+    if barcode_id:
+    # 1. Pastikan data adalah string dan bersihkan karakter whitespace
+        if not isinstance(barcode_id, str):
+            barcode_id = str(barcode_id)
+    
         barcode_id = barcode_id.replace('\n','').replace('\r','').replace('\t','').strip()
 
-        # Debounce 3 detik
+        # 2. Debounce Logic (Cegah scan ganda)
         now = time.time()
         if (barcode_id == st.session_state.get('last_id_scan_value', '') and
                 now - st.session_state.get('last_id_scan_time', 0) < 3.0):
             st.stop()
+
         st.session_state.last_id_scan_value = barcode_id
         st.session_state.last_id_scan_time  = now
 
+        # 3. Validasi Format "NIK;Nama"
         if ";" not in barcode_id:
-            st.error("❌ Format ID tidak valid. Format: NIK;Nama")
+            st.error(f"❌ Format ID tidak valid: '{barcode_id}'. Gunakan format NIK;Nama")
             st.stop()
 
-        parts    = barcode_id.split(';')
-        raw_nik  = parts[0].strip()
+        parts = barcode_id.split(';')
+        raw_nik = parts[0].strip()
         raw_nama = parts[1].strip() if len(parts) > 1 else ""
 
         if not raw_nik or not raw_nama:
-            st.error("❌ NIK atau Nama kosong. Coba scan ulang.")
+            st.error("❌ NIK atau Nama kosong di barcode. Coba scan ulang.")
             st.stop()
 
-        # Verifikasi NIK
+        # 4. Verifikasi NIK ke Master Data (Supabase/Session State)
         nik_scan_clean   = bersihkan_nik(raw_nik)
-        nik_master_clean = [bersihkan_nik(n) for n in st.session_state.list_nik_terdaftar]
+        # Pastikan list_nik_terdaftar sudah ada isinya
+        nik_master_clean = [bersihkan_nik(str(n)) for n in st.session_state.get('list_nik_terdaftar', [])]
+
         if nik_scan_clean not in nik_master_clean:
-            st.error(f"🚫 Akses Ditolak! NIK {raw_nik} tidak terdaftar.")
-            time.sleep(2); st.rerun()
+            st.error(f"🚫 Akses Ditolak! NIK {raw_nik} tidak terdaftar di sistem.")
+        time.sleep(2)
+        st.rerun()
+    
+        # JIKA LOLOS, LANJUTKAN PROSES...
+        st.success(f"Selamat bekerja, {raw_nama}!")
 
         # Guard + set identity SEBELUM API call
         st.session_state.sedang_proses_scan_id = True
