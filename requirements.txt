@@ -5,3 +5,4 @@ pytz
 gspread
 streamlit-qrcode-scanner
 oauth2client
+supabase
