@@ -736,10 +736,9 @@ if not nama_karyawan:
     barcode_id = qrcode_scanner(key='scanner_id_operator')
 
     if barcode_id:
+        str_barcode = str(barcode_id) if not isinstance(barcode_id, str) else barcode_id
         # Bersihkan karakter tersembunyi
-        if not isinstance(barcode_id, str):
-            barcode_id = str(barcode_id)
-        barcode_id = barcode_id.replace('\n','').replace('\r','').replace('\t','').strip()
+        str_barcode = str_barcode.replace('\n','').replace('\r','').replace('\t','').strip()
 
         if not barcode_id:
             st.stop()
@@ -753,14 +752,21 @@ if not nama_karyawan:
         st.session_state.last_id_scan_time  = now
 
         # ── FIX BUG 1: Validasi format ──────────────────────
-        if ";" not in barcode_id:
-            st.error(f"❌ Format tidak valid: '{barcode_id}'. Harus: NIK;Nama")
-            st.stop()
+        if ";" in str_barcode:
+            parts = str_barcode.split(';')
+            raw_nik = parts[0].strip()
+            raw_nama = parts[1].strip() if len(parts) > 1 else ""
 
-        parts    = barcode_id.split(';')
-        raw_nik  = parts[0].strip()
-        raw_nama = parts[1].strip() if len(parts) > 1 else ""
+        else:
+            raw_nik = str_barcode
+            raw_nama = ""
 
+        # 2. Modifikasi pengecekan agar lebih fleksibel terhadap titik
+        nik_scan_clean = bersihkan_nik(raw_nik) # Menghasilkan "13160128"
+
+        # Pastikan master NIK juga dibersihkan dengan cara yang SAMA
+        nik_master_clean = [bersihkan_nik(str(n)) for n in st.session_state.get('list_nik_terdaftar', [])]
+        
         if not raw_nik or not raw_nama:
             st.error("❌ NIK atau Nama kosong di barcode.")
             st.stop()
@@ -771,11 +777,6 @@ if not nama_karyawan:
             bersihkan_nik(str(n))
             for n in st.session_state.get('list_nik_terdaftar', [])
         ]
-
-        # DEBUG sementara — hapus setelah login berhasil
-        st.caption(f"🔍 NIK scan: `{nik_scan_clean}` | "
-                   f"Jumlah NIK master: {len(nik_master_clean)} | "
-                   f"3 contoh: {nik_master_clean[:3]}")
 
         if nik_scan_clean not in nik_master_clean:
             st.error(f"🚫 Akses Ditolak! NIK {raw_nik} tidak terdaftar.")
