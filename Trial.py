@@ -245,7 +245,6 @@ def safe_sb(func, max_retries=3, op="operasi"):
 def load_master_karyawan():
     res = safe_sb(
         lambda: supabase.table("master_karyawan")
-            .select("NIK, Nama").eq("Aktif", True).execute(),
             .select("NIK, Nama")
             .execute(),           # ← tanpa filter Aktif
         op="Load master karyawan"
@@ -737,14 +736,11 @@ if not nama_karyawan:
     barcode_id = qrcode_scanner(key='scanner_id_operator')
 
     if barcode_id:
-    # 1. Pastikan data adalah string dan bersihkan karakter whitespace
         # Bersihkan karakter tersembunyi
         if not isinstance(barcode_id, str):
             barcode_id = str(barcode_id)
-    
         barcode_id = barcode_id.replace('\n','').replace('\r','').replace('\t','').strip()
 
-        # 2. Debounce Logic (Cegah scan ganda)
         if not barcode_id:
             st.stop()
 
@@ -753,33 +749,24 @@ if not nama_karyawan:
         if (barcode_id == st.session_state.get('last_id_scan_value', '') and
                 now - st.session_state.get('last_id_scan_time', 0) < 3.0):
             st.stop()
-
         st.session_state.last_id_scan_value = barcode_id
         st.session_state.last_id_scan_time  = now
 
-        # 3. Validasi Format "NIK;Nama"
         # ── FIX BUG 1: Validasi format ──────────────────────
         if ";" not in barcode_id:
-            st.error(f"❌ Format ID tidak valid: '{barcode_id}'. Gunakan format NIK;Nama")
             st.error(f"❌ Format tidak valid: '{barcode_id}'. Harus: NIK;Nama")
             st.stop()
 
-        parts = barcode_id.split(';')
-        raw_nik = parts[0].strip()
         parts    = barcode_id.split(';')
         raw_nik  = parts[0].strip()
         raw_nama = parts[1].strip() if len(parts) > 1 else ""
 
         if not raw_nik or not raw_nama:
-            st.error("❌ NIK atau Nama kosong di barcode. Coba scan ulang.")
             st.error("❌ NIK atau Nama kosong di barcode.")
             st.stop()
 
-        # 4. Verifikasi NIK ke Master Data (Supabase/Session State)
         # ── FIX BUG 2 & 3: Verifikasi NIK tanpa filter Aktif ──
         nik_scan_clean   = bersihkan_nik(raw_nik)
-        # Pastikan list_nik_terdaftar sudah ada isinya
-        nik_master_clean = [bersihkan_nik(str(n)) for n in st.session_state.get('list_nik_terdaftar', [])]
         nik_master_clean = [
             bersihkan_nik(str(n))
             for n in st.session_state.get('list_nik_terdaftar', [])
@@ -791,8 +778,6 @@ if not nama_karyawan:
                    f"3 contoh: {nik_master_clean[:3]}")
 
         if nik_scan_clean not in nik_master_clean:
-            st.error(f"🚫 Akses Ditolak! NIK {raw_nik} tidak terdaftar di sistem.")
-        time.sleep(2)
             st.error(f"🚫 Akses Ditolak! NIK {raw_nik} tidak terdaftar.")
             time.sleep(2)
             st.rerun()
@@ -850,9 +835,6 @@ if not nama_karyawan:
         st.session_state.sedang_proses_scan_id = False
         time.sleep(1)
         st.rerun()
-    
-        # JIKA LOLOS, LANJUTKAN PROSES...
-        st.success(f"Selamat bekerja, {raw_nama}!")
 
         # Guard + set identity SEBELUM API call
         st.session_state.sedang_proses_scan_id = True
