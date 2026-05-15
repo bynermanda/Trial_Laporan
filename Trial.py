@@ -245,17 +245,16 @@ def safe_sb(func, max_retries=3, op="operasi"):
 def load_master_karyawan():
     try:
         supabase = get_supabase()
-        # Ambil data NIK dari tabel master_karyawan
-        response = supabase.table("master_karyawan").select("NIK").execute()
+        # Mengambil data dari tabel master_karyawan
+        res = supabase.table("master_karyawan").select("NIK, Nama").execute()
         
-        # Pastikan kita mengembalikan .data yang merupakan sebuah LIST
-        if response and hasattr(response, 'data'):
-            return response.data
-        return [] # Kembalikan list kosong jika data tidak ada
+        # PENTING: Kembalikan res.data (ini adalah List of Dict)
+        if res and hasattr(res, 'data'):
+            return res.data
+        return []
     except Exception as e:
-        st.error(f"Koneksi Supabase Error: {e}")
-        return [] # Kembalikan list kosong jika terjadi error koneksi
-
+        st.error(f"Error Database: {e}")
+        return []
 
 @st.cache_data(ttl=3600)
 def load_main_data():
@@ -427,16 +426,25 @@ with st.sidebar:
 if 'list_nik_terdaftar' not in st.session_state or not st.session_state.list_nik_terdaftar:
     data_karyawan = load_master_karyawan()
     
-    # Tambahkan pengecekan apakah data_karyawan benar-benar sebuah list
+    # Pastikan data_karyawan adalah LIST, bukan Bool atau None
     if isinstance(data_karyawan, list) and len(data_karyawan) > 0:
-        st.session_state.list_nik_terdaftar = [
-            str(row.get('NIK', '')).strip() 
-            for row in data_karyawan 
-            if isinstance(row, dict) # Pastikan baris data adalah dictionary
-        ]
+        cleaned_list = []
+        for row in data_karyawan:
+            # Pengecekan tambahan: pastikan 'row' adalah dictionary
+            if isinstance(row, dict):
+                # Ambil NIK (cek huruf besar dan kecil)
+                val = row.get('NIK') or row.get('nik')
+                if val:
+                    cleaned_list.append(str(val).strip())
+        
+        st.session_state.list_nik_terdaftar = cleaned_list
+        
+        if not cleaned_list:
+            st.warning("⚠️ Data ditarik, tapi kolom NIK tidak ditemukan atau kosong.")
     else:
         st.session_state.list_nik_terdaftar = []
-        st.warning("⚠️ Database master_karyawan kosong atau tidak terhubung.")
+        # Jika masuk ke sini, berarti load_master_karyawan() gagal/kosong
+        st.warning("⚠️ Gagal mengambil data master. Cek koneksi Supabase & RLS.")
 
 try:
     main_df = load_main_data()
