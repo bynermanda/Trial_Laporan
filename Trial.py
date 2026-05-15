@@ -6,9 +6,9 @@ PERBAIKAN dari versi sebelumnya:
   1. Semua .get() dibungkus helper safe_get() — tidak akan crash walau None
   2. Nama kolom Supabase diseragamkan (tanpa spasi, tanpa tanda -)
      "Total Istirahat" → "Total_Istirahat"
-     "Check-In"        → "Check_In"
-     "Check-Out"       → "Check_Out"
-  3. Parsing Waktu_Mulai/Check_In robust terhadap format timezone suffix
+     "Check-In"        → "Check-In"
+     "Check-Out"       → "Check-Out"
+  3. Parsing Waktu_Mulai/Check-In robust terhadap format timezone suffix
   4. load_proses_aktif_nik tidak di-.clear() berulang — pakai query langsung
   5. Guard None di semua titik yang akses data dari Supabase
 """
@@ -84,8 +84,8 @@ supabase = get_supabase()
 #   "Tanggal"   DATE,
 #   "Nama"      TEXT,
 #   "NIK"       TEXT,
-#   "Check_In"  TEXT,
-#   "Check_Out" TEXT,
+#   "Check-In"  TEXT,
+#   "Check-Out" TEXT,
 #   "Total_Jam" NUMERIC(6,2) DEFAULT 0,
 #   "Aktivitas" TEXT DEFAULT 'Mulai Shift'
 # );
@@ -177,7 +177,7 @@ def parse_waktu(waktu_str) -> str:
 
 def parse_datetime_dari_row(tgl_str, waktu_str, fallback=None):
     """
-    Bangun datetime dari kolom Tanggal + Waktu_Mulai / Check_In.
+    Bangun datetime dari kolom Tanggal + Waktu_Mulai / Check-In.
     Return fallback (default: waktu sekarang WIB) jika gagal.
     """
     if fallback is None:
@@ -198,10 +198,10 @@ def get_waktu_wib() -> datetime:
 
 
 def get_checkin_datetime(checkin_row: dict, waktu_out: datetime) -> datetime:
-    """Parse Check_In datetime, handle cross-midnight."""
+    """Parse Check-In datetime, handle cross-midnight."""
     dt_in = parse_datetime_dari_row(
         safe_get(checkin_row, 'Tanggal'),
-        safe_get(checkin_row, 'Check_In'),
+        safe_get(checkin_row, 'Check-In'),
         fallback=waktu_out - timedelta(hours=8)
     )
     if dt_in > waktu_out:
@@ -243,14 +243,18 @@ def safe_sb(func, max_retries=3, op="operasi"):
 # ─────────────────────────────────────────────────────────────
 @st.cache_data(ttl=3600)
 def load_master_karyawan():
-    res = safe_sb(
-        lambda: supabase.table("master_karyawan")
-            .select("NIK, Nama")
-            .execute(),           # ← tanpa filter Aktif
-        op="Load master karyawan"
-    )
-    return pd.DataFrame(res.data) if (res and res.data) else pd.DataFrame()
-
+    try:
+        supabase = get_supabase()
+        # Mengambil data dari tabel master_karyawan
+        res = supabase.table("master_karyawan").select("NIK, Nama").execute()
+        
+        # PENTING: Kembalikan res.data (ini adalah List of Dict)
+        if res and hasattr(res, 'data'):
+            return res.data
+        return []
+    except Exception as e:
+        st.error(f"Error Database: {e}")
+        return []
 
 @st.cache_data(ttl=3600)
 def load_main_data():
@@ -305,7 +309,7 @@ def load_proses_aktif_nik_cached(nik_clean: str):
 
 def query_waktu_kerja_aktif(nik_clean: str):
     """
-    Query langsung check-in aktif (Check_Out IS NULL) untuk NIK hari ini.
+    Query langsung check-in aktif (Check-Out IS NULL) untuk NIK hari ini.
     Return: dict baris | None
     """
     try:
@@ -419,15 +423,28 @@ with st.sidebar:
 # ─────────────────────────────────────────────────────────────
 # LOAD DATA MASTER — sekali per session
 # ─────────────────────────────────────────────────────────────
-if 'list_nik_terdaftar' not in st.session_state:
-    try:
-        df_master = load_master_karyawan()
-        st.session_state.list_nik_terdaftar = (
-            df_master['NIK'].astype(str).str.strip().tolist()
-            if not df_master.empty else []
-        )
-    except Exception:
+if 'list_nik_terdaftar' not in st.session_state or not st.session_state.list_nik_terdaftar:
+    data_karyawan = load_master_karyawan()
+    
+    # Pastikan data_karyawan adalah LIST, bukan Bool atau None
+    if isinstance(data_karyawan, list) and len(data_karyawan) > 0:
+        cleaned_list = []
+        for row in data_karyawan:
+            # Pengecekan tambahan: pastikan 'row' adalah dictionary
+            if isinstance(row, dict):
+                # Ambil NIK (cek huruf besar dan kecil)
+                val = row.get('NIK') or row.get('nik')
+                if val:
+                    cleaned_list.append(str(val).strip())
+        
+        st.session_state.list_nik_terdaftar = cleaned_list
+        
+        if not cleaned_list:
+            st.warning("⚠️ Data ditarik, tapi kolom NIK tidak ditemukan atau kosong.")
+    else:
         st.session_state.list_nik_terdaftar = []
+        # Jika masuk ke sini, berarti load_master_karyawan() gagal/kosong
+        st.warning("⚠️ Gagal mengambil data master. Cek koneksi Supabase & RLS.")
 
 try:
     main_df = load_main_data()
@@ -539,7 +556,7 @@ def simpan_proses_finish(row_id: int, data_dict: dict) -> bool:
 
 
 def simpan_checkin(nama: str, nik: str, waktu_now: datetime) -> bool:
-    """INSERT check-in baru. Kolom: Tanggal, Nama, NIK, Check_In, Check_Out, Total_Jam, Aktivitas"""
+    """INSERT check-in baru. Kolom: Tanggal, Nama, NIK, Check-In, Check-Out, Total_Jam, Aktivitas"""
     try:
         nik_clean = bersihkan_nik(nik)
         # Cek duplikat
@@ -552,8 +569,8 @@ def simpan_checkin(nama: str, nik: str, waktu_now: datetime) -> bool:
             "Tanggal":    waktu_now.strftime("%Y-%m-%d"),
             "Nama":       nama,
             "NIK":        nik_clean,
-            "Check_In":   waktu_now.strftime("%H:%M:%S"),
-            "Check_Out":  None,
+            "Check-In":   waktu_now.strftime("%H:%M:%S"),
+            "Check-Out":  None,
             "Total_Jam":  0,
             "Aktivitas":  "Mulai Shift",
         }
@@ -574,13 +591,13 @@ def simpan_checkin(nama: str, nik: str, waktu_now: datetime) -> bool:
 
 
 def simpan_checkout(row_id: int, waktu_out: datetime, total_jam: float) -> bool:
-    """UPDATE Check_Out by id."""
+    """UPDATE Check-Out by id."""
     try:
         if not row_id:
             st.error("❌ row_id check-in tidak valid.")
             return False
         payload = {
-            "Check_Out": waktu_out.strftime("%H:%M:%S"),
+            "Check-Out": waktu_out.strftime("%H:%M:%S"),
             "Total_Jam": round(total_jam, 2),
             "Aktivitas": "Shift Complete",
         }
@@ -724,64 +741,69 @@ is_sudah_checkin = st.session_state.is_sudah_checkin
 
 
 # ─────────────────────────────────────────────────────────────
-# LAYAR 1: SCAN ID OPERATOR
+# LAYAR 1: SCAN ID OPERATOR (REVISI)
 # ─────────────────────────────────────────────────────────────
-if not nama_karyawan:
+if not st.session_state.get('nama_karyawan'):
     st.subheader("👋 Selamat Datang! Silakan Scan ID Operator")
-
-    if st.session_state.get('sedang_proses_scan_id', False):
-        st.info("⏳ Memproses data operator, harap tunggu...")
-        st.stop()
 
     barcode_id = qrcode_scanner(key='scanner_id_operator')
 
     if barcode_id:
-        # Bersihkan karakter tersembunyi
-        if not isinstance(barcode_id, str):
-            barcode_id = str(barcode_id)
-        barcode_id = barcode_id.replace('\n','').replace('\r','').replace('\t','').strip()
+        # A. Konversi objek scanner ke String (Handle BytesIO/None)
+        if hasattr(barcode_id, 'getvalue'):
+            str_barcode = barcode_id.getvalue().decode("utf-8")
+        else:
+            str_barcode = str(barcode_id)
 
-        if not barcode_id:
+        # B. Bersihkan karakter whitespace/tersembunyi
+        str_barcode = str_barcode.replace('\n','').replace('\r','').replace('\t','').strip()
+
+        if not str_barcode:
             st.stop()
 
-        # Debounce 3 detik
+        # C. Debounce Logic (3 detik)
         now = time.time()
-        if (barcode_id == st.session_state.get('last_id_scan_value', '') and
-                now - st.session_state.get('last_id_scan_time', 0) < 3.0):
+        if (str_barcode == st.session_state.get('last_id_scan_value', '') and
+            now - st.session_state.get('last_id_scan_time', 0) < 3.0):
             st.stop()
-        st.session_state.last_id_scan_value = barcode_id
+        
+        st.session_state.last_id_scan_value = str_barcode
         st.session_state.last_id_scan_time  = now
 
-        # ── FIX BUG 1: Validasi format ──────────────────────
-        if ";" not in barcode_id:
-            st.error(f"❌ Format tidak valid: '{barcode_id}'. Harus: NIK;Nama")
-            st.stop()
+        # D. Pecah Format "NIK;Nama"
+        if ";" in str_barcode:
+            parts = str_barcode.split(';')
+            raw_nik = parts[0].strip()
+            # Ambil nama dari barcode sebagai fallback jika di database tidak ada
+            raw_nama_barcode = parts[1].strip() if len(parts) > 1 else ""
+        else:
+            raw_nik = str_barcode
+            raw_nama_barcode = ""
 
-        parts    = barcode_id.split(';')
-        raw_nik  = parts[0].strip()
-        raw_nama = parts[1].strip() if len(parts) > 1 else ""
+        # E. Verifikasi ke Master Data
+        nik_scan_clean = bersihkan_nik(raw_nik)
+        
+        # Ambil data master dari session state
+        master_list = st.session_state.get('list_nik_terdaftar', [])
+        
+        # Buat mapping NIK -> Nama agar nama yang muncul sesuai Database, bukan cuma Barcode
+        # Anggap list_nik_terdaftar berisi dictionary hasil query Supabase
+        nik_to_name = {bersihkan_nik(str(row['NIK'])): row['Nama'] for row in master_list if 'NIK' in row}
 
-        if not raw_nik or not raw_nama:
-            st.error("❌ NIK atau Nama kosong di barcode.")
-            st.stop()
-
-        # ── FIX BUG 2 & 3: Verifikasi NIK tanpa filter Aktif ──
-        nik_scan_clean   = bersihkan_nik(raw_nik)
-        nik_master_clean = [
-            bersihkan_nik(str(n))
-            for n in st.session_state.get('list_nik_terdaftar', [])
-        ]
-
-        # DEBUG sementara — hapus setelah login berhasil
-        st.caption(f"🔍 NIK scan: `{nik_scan_clean}` | "
-                   f"Jumlah NIK master: {len(nik_master_clean)} | "
-                   f"3 contoh: {nik_master_clean[:3]}")
-
-        if nik_scan_clean not in nik_master_clean:
-            st.error(f"🚫 Akses Ditolak! NIK {raw_nik} tidak terdaftar.")
+        if nik_scan_clean in nik_to_name:
+            # JIKA TERDAFTAR
+            nama_db = nik_to_name[nik_scan_clean]
+            st.session_state.nama_karyawan = nama_db
+            st.session_state.nik_karyawan = raw_nik
+            st.success(f"✅ Login Berhasil: {nama_db}")
+            time.sleep(1)
+            st.rerun()
+        else:
+            # JIKA TIDAK TERDAFTAR
+            st.error(f"🚫 Akses Ditolak! NIK {raw_nik} tidak terdaftar di database.")
+            st.write("Isi 5 NIK pertama di Memori:", st.session_state.list_nik_terdaftar[:5])
             time.sleep(2)
             st.rerun()
-            st.stop()  # pastikan eksekusi berhenti
 
         # ── Lolos verifikasi — lanjutkan proses ─────────────
         st.session_state.sedang_proses_scan_id = True
