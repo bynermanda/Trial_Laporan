@@ -243,13 +243,18 @@ def safe_sb(func, max_retries=3, op="operasi"):
 # ─────────────────────────────────────────────────────────────
 @st.cache_data(ttl=3600)
 def load_master_karyawan():
-    res = safe_sb(
-        lambda: supabase.table("master_karyawan")
-            .select("NIK, Nama")
-            .execute(),           # ← tanpa filter Aktif
-        op="Load master karyawan"
-    )
-    return pd.DataFrame(res.data) if (res and res.data) else pd.DataFrame()
+    try:
+        supabase = get_supabase()
+        # Ambil data NIK dari tabel master_karyawan
+        response = supabase.table("master_karyawan").select("NIK").execute()
+        
+        # Pastikan kita mengembalikan .data yang merupakan sebuah LIST
+        if response and hasattr(response, 'data'):
+            return response.data
+        return [] # Kembalikan list kosong jika data tidak ada
+    except Exception as e:
+        st.error(f"Koneksi Supabase Error: {e}")
+        return [] # Kembalikan list kosong jika terjadi error koneksi
 
 
 @st.cache_data(ttl=3600)
@@ -419,15 +424,19 @@ with st.sidebar:
 # ─────────────────────────────────────────────────────────────
 # LOAD DATA MASTER — sekali per session
 # ─────────────────────────────────────────────────────────────
-if 'list_nik_terdaftar' not in st.session_state:
-    try:
-        df_master = load_master_karyawan()
-        st.session_state.list_nik_terdaftar = (
-            df_master['NIK'].astype(str).str.strip().tolist()
-            if not df_master.empty else []
-        )
-    except Exception:
+if 'list_nik_terdaftar' not in st.session_state or not st.session_state.list_nik_terdaftar:
+    data_karyawan = load_master_karyawan()
+    
+    # Tambahkan pengecekan apakah data_karyawan benar-benar sebuah list
+    if isinstance(data_karyawan, list) and len(data_karyawan) > 0:
+        st.session_state.list_nik_terdaftar = [
+            str(row.get('NIK', '')).strip() 
+            for row in data_karyawan 
+            if isinstance(row, dict) # Pastikan baris data adalah dictionary
+        ]
+    else:
         st.session_state.list_nik_terdaftar = []
+        st.warning("⚠️ Database master_karyawan kosong atau tidak terhubung.")
 
 try:
     main_df = load_main_data()
@@ -784,7 +793,7 @@ if not st.session_state.get('nama_karyawan'):
         else:
             # JIKA TIDAK TERDAFTAR
             st.error(f"🚫 Akses Ditolak! NIK {raw_nik} tidak terdaftar di database.")
-            st.info("Pastikan NIK sudah di-input ke tabel master_karyawan di Supabase.")
+            st.write("Isi 5 NIK pertama di Memori:", st.session_state.list_nik_terdaftar[:5])
             time.sleep(2)
             st.rerun()
 
