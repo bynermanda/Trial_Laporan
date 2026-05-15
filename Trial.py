@@ -315,7 +315,7 @@ def query_waktu_kerja_aktif(nik_clean: str):
                 .select("*")
                 .eq("NIK", nik_clean)
                 .eq("Tanggal", hari_ini)
-                .is_("Check_Out", "null")
+                .is_("Check-Out", "null")
                 .order("id", desc=True)
                 .limit(1)
                 .execute(),
