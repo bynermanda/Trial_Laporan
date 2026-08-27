@@ -282,6 +282,9 @@ def simpan_ke_sheet(data_dict, tipe):
                 st.error("⚠️ Data START sudah ada di database. Klik Reset Scanner lalu scan ulang.")
                 return False
 
+            # Pastikan semua kolom ber-tipe object agar aman dari type mismatch float64
+            df_proses = df_proses.astype(object)
+
             updated_df = pd.concat([df_proses, pd.DataFrame([data_dict])], ignore_index=True)
             safe_gsheet_update(conn, URL_KITA, "Proses", updated_df)
             read_proses_sheet.clear()
@@ -290,10 +293,8 @@ def simpan_ke_sheet(data_dict, tipe):
         elif tipe == "FINISH":
             df_proses = read_proses_sheet(URL_KITA).copy()
 
-            kolom_angka = ['Total_Jam', 'Rasio_NG', '%_Prod', 'ACT']
-            for col in kolom_angka:
-                if col in df_proses.columns:
-                    df_proses[col] = df_proses[col].astype(object)
+            # FIX: Konversi SELURUH kolom DataFrame menjadi object untuk mencegah error dtype float64
+            df_proses = df_proses.astype(object)
 
             nama_karyawan = st.session_state.get('nama_terpilih', '')
             mask = (
@@ -305,14 +306,15 @@ def simpan_ke_sheet(data_dict, tipe):
 
             if mask.any():
                 idx = df_proses[mask].index[-1]
-                # 🟢 Disesuaikan: Waktu_Selesai dikosongkan, actual_time_finish diisi nilai manual
+                
+                # Masukkan data baru secara aman
                 df_proses.at[idx, 'Waktu_Selesai']     = ""
-                df_proses.at[idx, 'actual_time_finish'] = data_dict['actual_time_finish']
+                df_proses.at[idx, 'actual_time_finish'] = str(data_dict['actual_time_finish'])
                 df_proses.at[idx, 'ACT']                = data_dict['ACT']
                 df_proses.at[idx, 'NG']                 = data_dict['NG']
-                df_proses.at[idx, '%_Prod']             = data_dict['%_Prod']
+                df_proses.at[idx, '%_Prod']             = str(data_dict['%_Prod'])
                 df_proses.at[idx, 'Total Istirahat']    = data_dict['Total Istirahat']
-                df_proses.at[idx, 'Rasio_NG']           = data_dict['Rasio_NG']
+                df_proses.at[idx, 'Rasio_NG']           = str(data_dict['Rasio_NG'])
                 df_proses.at[idx, 'Total_Jam']          = data_dict['Total_Jam']
                 df_proses.at[idx, 'Status']             = 'FINISH'
 
@@ -325,6 +327,8 @@ def simpan_ke_sheet(data_dict, tipe):
 
         elif tipe == "ABNORMAL":
             df_existing = read_abnormal_sheet(URL_KITA).copy()
+            df_existing = df_existing.astype(object)
+            
             updated_df = pd.concat([df_existing, pd.DataFrame([data_dict])], ignore_index=True)
             safe_gsheet_update(conn, URL_KITA, "ABNORMAL", updated_df)
             read_abnormal_sheet.clear()
