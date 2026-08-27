@@ -4,7 +4,7 @@ from streamlit_qrcode_scanner import qrcode_scanner
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import pytz
-from datetime import datetime, timedelta, date, time as dt_time
+from datetime import datetime, timedelta, date
 import time
 import random
 
@@ -22,14 +22,6 @@ def safe_gsheet_update(conn, spreadsheet, worksheet, data, max_retries=4):
     Wrapper conn.update dengan exponential backoff + jitter.
     Menangani 429 Quota Exceeded dan 500/503 Server Error.
     """
-    # 🛡️ GUARD: Cegah penghapusan tidak sengaja jika DataFrame kosong
-    if data is None:
-        st.error("❌ Gagal menyimpan: Data bernilai None!")
-        return False
-    if hasattr(data, 'empty') and data.empty:
-        st.error("❌ CRITICAL: Data kosong terdeteksi! Operasi dibatalkan demi keamanan sheet.")
-        return False
-
     for attempt in range(max_retries):
         try:
             conn.update(spreadsheet=spreadsheet, worksheet=worksheet, data=data)
@@ -242,26 +234,47 @@ if 'nik_karyawan' not in st.session_state:
 
 # ============================================================
 # CACHED SHEET READERS
+# Nama worksheet sesuai GSheet: "MainData", "Proses",
+# "ABNORMAL", "Waktu Kerja", "Master_Karyawan"
 # ============================================================
 
 @st.cache_data(ttl=3600)
 def get_main_data(url):
+    """Worksheet: MainData — kolom: Part_No, Part_Name, MODEL, LINE, URUTAN, SEC /PCS"""
     df = conn.read(spreadsheet=url, worksheet="MainData", ttl=3600)
     df.columns = df.columns.str.strip()
     return df
 
 @st.cache_data(ttl=10)
 def read_proses_sheet(url):
+    """
+    Worksheet: Proses
+    Kolom: Tanggal, Nama, NIK, Part_No, Part_Name, Model, Line,
+           Urutan_Proses, Actual_Line, Sec_Pcs, Waktu_Mulai,
+           Waktu_Selesai, ACT, NG, %_Prod, Total Istirahat,
+           Rasio_NG, Total_Jam, Status
+    """
     df = conn.read(spreadsheet=url, worksheet="Proses", ttl=10)
     df.columns = df.columns.str.strip()
     return df
 
 @st.cache_data(ttl=30)
 def read_abnormal_sheet(url):
+    """
+    Worksheet: ABNORMAL
+    Kolom: Tanggal, Mesin, Part_No, Model, Part_Name,
+           Urutan_Proses, Operator, Kode_Abnormal,
+           Uraian_Abnormal, Total_Waktu, Keterangan
+    """
     return conn.read(spreadsheet=url, worksheet="ABNORMAL", ttl=30)
 
 @st.cache_data(ttl=30)
 def read_waktu_kerja_sheet(url):
+    """
+    Worksheet: Waktu Kerja
+    Kolom: Tanggal, Nama, NIK, Check-In, Check-Out,
+           Total_Jam, Aktivitas
+    """
     return conn.read(spreadsheet=url, worksheet="Waktu Kerja", ttl=30)
 
 
@@ -316,6 +329,7 @@ def simpan_ke_sheet(data_dict, tipe):
 
             if mask.any():
                 idx = df_proses[mask].index[-1]
+                # Nama kolom sesuai sheet
                 df_proses.at[idx, 'Waktu_Selesai']   = data_dict['Waktu_Selesai']
                 df_proses.at[idx, 'ACT']              = data_dict['ACT']
                 df_proses.at[idx, 'NG']               = data_dict['NG']
@@ -346,6 +360,10 @@ def simpan_ke_sheet(data_dict, tipe):
         return False
 
 
+# ============================================================
+# FUNGSI BANTU: CARI BARIS CHECK-IN AKTIF (belum check-out)
+# Kolom sheet: Nama, Check-Out
+# ============================================================
 def get_last_active_row(df, nama):
     if 'Check-Out' not in df.columns or 'Nama' not in df.columns:
         return None
@@ -360,6 +378,10 @@ def get_last_active_row(df, nama):
     return None
 
 
+# ============================================================
+# FUNGSI BANTU: CEK PROSES AKTIF (START) UNTUK OPERATOR
+# Kolom sheet: NIK, Status
+# ============================================================
 def cek_proses_aktif(nik_input):
     try:
         df = read_proses_sheet(URL_KITA).copy()
@@ -398,6 +420,7 @@ def handle_scan():
     status_sekarang = st.session_state.get('status_kerja', 'IDLE')
 
     if status_sekarang == "IDLE":
+        # Pakai cached function, bukan conn.read langsung
         if 'proses_data' not in st.session_state:
             st.session_state.proses_data = [read_proses_sheet(URL_KITA)]
 
@@ -461,6 +484,7 @@ nik_karyawan  = st.session_state.get('nik_karyawan', "")
 if 'is_sudah_checkin' not in st.session_state:
     st.session_state.is_sudah_checkin = False
 
+# Cek status check-in dari sheet jika belum terverifikasi di session
 if nama_karyawan and not st.session_state.is_sudah_checkin:
     if 'data_waktu_kerja' not in st.session_state:
         try:
@@ -489,24 +513,11 @@ if not nama_karyawan:
     barcode_id = qrcode_scanner(key='scanner_id_operator')
 
     if barcode_id:
-        if isinstance(barcode_id, (bytes, bytearray)):
-            barcode_id = barcode_id.decode("utf-8", errors="ignore")
-        elif hasattr(barcode_id, "read"):
-            try:
-                file_data = barcode_id.read()
-                if isinstance(file_data, (bytes, bytearray)):
-                    barcode_id = file_data.decode("utf-8", errors="ignore")
-                else:
-                    barcode_id = str(file_data)
-            except Exception:
-                barcode_id = str(barcode_id)
-
-        barcode_id = str(barcode_id).strip()
-
         if ";" in barcode_id:
             raw_nik  = barcode_id.split(';')[0].strip()
             raw_nama = barcode_id.split(';')[1].strip()
 
+            # FIX 5: exact match saat verifikasi NIK master
             nik_scan_clean   = raw_nik.replace(".", "").strip()
             nik_master_clean = [str(n).replace(".", "").strip() for n in st.session_state.list_nik_terdaftar]
 
@@ -568,6 +579,7 @@ if not nama_karyawan:
 elif not is_sudah_checkin:
     st.warning(f"⚠️ Halo **{nama_karyawan}** | {nik_karyawan} — Anda belum Check-In.")
 
+    # FIX 4: Guard double-click SEBELUM tombol dirender
     if st.session_state.get('checkin_sedang_proses', False):
         st.warning("⏳ Check-In sedang diproses, harap tunggu...")
         st.stop()
@@ -579,8 +591,10 @@ elif not is_sudah_checkin:
             waktu_skrg = get_waktu_wib()
 
             with st.spinner("Membaca data Check-In..."):
+                # ttl=0 agar selalu baca data terbaru saat check-in
                 df_to_save = safe_gsheet_read(conn, URL_KITA, "Waktu Kerja", ttl=0)
 
+            # FIX 5: exact match NIK sebelum simpan, cegah duplikat
             nik_clean = str(nik_karyawan).replace("'", "").replace(".", "").strip()
             duplikat = df_to_save[
                 (df_to_save['NIK'].astype(str).str.replace("'", "").str.replace(".", "").str.strip() == nik_clean) &
@@ -596,6 +610,7 @@ elif not is_sudah_checkin:
                 time.sleep(1)
                 st.rerun()
 
+            # Data check-in baru — kolom sesuai worksheet "Waktu Kerja"
             new_data = {
                 "Tanggal":    waktu_skrg.strftime("%Y-%m-%d"),
                 "Nama":       nama_karyawan,
@@ -612,6 +627,7 @@ elif not is_sudah_checkin:
                 berhasil = safe_gsheet_update(conn, URL_KITA, "Waktu Kerja", df_updated)
 
             if berhasil:
+                # FIX 7: invalidate cache & session agar rerun langsung baca fresh
                 read_waktu_kerja_sheet.clear()
                 if 'data_waktu_kerja' in st.session_state:
                     del st.session_state.data_waktu_kerja
@@ -624,6 +640,7 @@ elif not is_sudah_checkin:
                 st.rerun()
 
         except Exception as e:
+            # FIX 2: tampilkan pesan error spesifik per kode error
             st.session_state.checkin_sedang_proses = False
             error_msg = str(e)
             if "429" in error_msg or "quota" in error_msg.lower() or "rate" in error_msg.lower():
@@ -695,6 +712,7 @@ else:
                     with st.spinner("Memproses Check-Out..."):
                         try:
                             waktu_out = get_waktu_wib()
+                            # Baca fresh saat checkout — ttl=0
                             df_waktu = safe_gsheet_read(conn, URL_KITA, "Waktu Kerja", ttl=0).copy()
                             checkin_row = get_last_active_row(df_waktu, nama_karyawan)
 
@@ -702,16 +720,19 @@ else:
                                 dt_in = get_checkin_datetime(checkin_row, waktu_out)
                                 total_jam_shift = round((waktu_out - dt_in).total_seconds() / 3600, 2)
 
+                                # FIX: mask pakai isna() | string kosong agar robust
                                 mask_update = (
                                     (df_waktu['Nama'] == nama_karyawan) &
                                     (df_waktu['Check-Out'].isna() | (df_waktu['Check-Out'].astype(str).str.strip() == ""))
                                 )
                                 idx_pd = df_waktu[mask_update].index[-1]
 
+                                # Nama kolom sesuai worksheet "Waktu Kerja"
                                 df_waktu.at[idx_pd, 'Check-Out']  = waktu_out.strftime("%H:%M:%S")
                                 df_waktu.at[idx_pd, 'Total_Jam']  = total_jam_shift
                                 df_waktu.at[idx_pd, 'Aktivitas']  = "Shift Complete"
 
+                                # FIX 3: pakai safe_gsheet_update — ada retry kalau 429
                                 safe_gsheet_update(conn, URL_KITA, "Waktu Kerja", df_waktu)
                                 read_waktu_kerja_sheet.clear()
 
@@ -755,6 +776,7 @@ else:
         add_options   = ["BM", "CM", "DM", "ERM", "NRM", "IRM", "KRM"]
         list_line     = list(dict.fromkeys(list_line_db + add_options))
 
+        # Tambah opsi DPMR kalau belum ada
         if not any(p.get('URUTAN') == 'DPMR' for p in data_pilihan):
             sample = data_pilihan[0] if data_pilihan else {}
             dpmr_data = {
@@ -792,62 +814,51 @@ else:
     elif status_kerja == "RUNNING":
         dp = st.session_state.get('current_part')
         if dp:
-            st.info(f"⚡ **Proses Berjalan:** {dp['part_name']} | {dp['part_no']}")
-            st.write("### Konfirmasi Mulai Kerja")
-
-            # Tombol START — hanya muncul jika belum diklik
-            if not st.session_state.get('sudah_start_diklik'):
-                st.warning("⚠️ Silakan tentukan Waktu Start Manual lalu klik tombol di bawah untuk mulai menghitung produksi.")
-                
-                # 🆕 FITUR TAMBAHAN: Input Waktu Manual oleh Operator
-                waktu_sekarang_wib = get_waktu_wib()
-                waktu_input_manual = st.time_input("🕒 Pilih Waktu Start Produksi (Manual):", value=waktu_sekarang_wib.time())
-
-                if st.button("🚀 Konfirmasi Start Proses", use_container_width=True):
-                    # Gabungkan Tanggal hari ini dengan waktu pilihan operator
-                    waktu_start_dt = datetime.combine(date.today(), waktu_input_manual)
-                    st.session_state.waktu_start = waktu_start_dt
-
-                    data_start = {
-                        "Tanggal":           date.today().strftime("%Y-%m-%d"),
-                        "Nama":              nama_karyawan,
-                        "NIK":               f"'{st.session_state.get('nik_karyawan', '-')}",
-                        "Part_No":           dp['part_no'],
-                        "Part_Name":         dp['part_name'],
-                        "Model":             dp['model'],
-                        "Line":              dp['line'],
-                        "Urutan_Proses":     f"'{dp['urutan_proses']}",
-                        "Actual_Line":       dp.get('Actual_Line', ""),
-                        "Sec_Pcs":           dp['sec_pcs'],
-                        "Waktu_Mulai":       waktu_start_dt.strftime("%H:%M:%S"),
-                        "actual_time_start": waktu_start_dt.strftime("%H:%M:%S"),  # 🆕 Kolom Baru tersimpan di GSheet
-                        "Waktu_Selesai":     "",
-                        "ACT":               0,
-                        "NG":                0,
-                        "Status":            "START"
-                    }
-                    if simpan_ke_sheet(data_start, "START"):
-                        st.session_state.sudah_start_diklik = True
-                        st.balloons()
-                        time.sleep(1)
-                        st.success("✅ Produksi Dimulai!")
-                        st.rerun()
-            else:
-                st.success("✅ Proses Sudah Dimulai")
-                st.info("⚠️ Input ABNORMAL di bawah dan scan KANBAN FINISH untuk akhiri proses.")
-                st.info("DATA START ANDA SUDAH TERSIMPAN DI DATABASE. SELAMAT BEKERJA! 🙌")
-
-            # Hitung durasi live dari waktu_start (termasuk waktu_start manual jika diubah)
             waktu_sekarang = get_waktu_wib()
             durasi_live    = waktu_sekarang - st.session_state.waktu_start.replace(tzinfo=None)
             menit_live     = int(durasi_live.total_seconds() / 60)
             jam_live       = round(durasi_live.total_seconds() / 3600, 2)
 
+            st.info(f"⚡ **Proses Berjalan:** {dp['part_name']} | {dp['part_no']}")
+            st.write("Konfirmasi Mulai Kerja")
+
+            # Tombol START — hanya muncul jika belum diklik
+            if not st.session_state.get('sudah_start_diklik'):
+                st.warning("⚠️ Anda belum mengkonfirmasi START PROSES. Klik tombol di bawah untuk mulai menghitung waktu produksi.")
+                if st.button("🚀 Konfirmasi Start Proses", use_container_width=True):
+                    data_start = {
+                        "Tanggal":       get_waktu_wib().strftime("%Y-%m-%d"),
+                        "Nama":          nama_karyawan,
+                        "NIK":           f"'{st.session_state.get('nik_karyawan', '-')}",
+                        "Part_No":       dp['part_no'],
+                        "Part_Name":     dp['part_name'],
+                        "Model":         dp['model'],
+                        "Line":          dp['line'],
+                        "Urutan_Proses": f"'{dp['urutan_proses']}",
+                        "Actual_Line":   dp.get('Actual_Line', ""),
+                        "Sec_Pcs":       dp['sec_pcs'],
+                        "Waktu_Mulai":   st.session_state.waktu_start.strftime("%H:%M:%S"),
+                        "Waktu_Selesai": "",
+                        "ACT":           0,
+                        "NG":            0,
+                        "Status":        "START"
+                    }
+                    if simpan_ke_sheet(data_start, "START"):
+                        st.session_state.sudah_start_diklik = True
+                        st.balloons()
+                        time.sleep(2)
+                        st.success("✅ Produksi Dimulai!")
+                        st.rerun()
+            else:
+                st.success("✅ Proses Sudah Dimulai")
+                st.info("⚠️ Input ABNORNAL di bawah dan scan KANBAN FINISH untuk akhiri proses.")
+                st.info("DATA START ANDA SUDAH TERSIMPAN DI DATABASE. SELAMAT BEKERJA! 🙌")
+
             # Metric cards
             col1, col2, col3, col4, col5 = st.columns(5, gap="small")
             col1.metric("Urutan",          dp['urutan_proses'])
             col2.metric("Target Sec/Pcs",  dp['sec_pcs'])
-            col3.metric("Mulai (Start)",   st.session_state.waktu_start.strftime('%H:%M:%S'))
+            col3.metric("Mulai",           st.session_state.waktu_start.strftime('%H:%M:%S'))
             col4.metric("Sudah Berjalan",  f"{menit_live % 1440} Menit", delta=f"{jam_live % 60} Jam")
             col5.metric("Actual Line",     dp.get('Actual_Line', ''))
 
@@ -883,9 +894,10 @@ else:
                         uraian_abnormal = parts[1].replace("]", "") if len(parts) > 1 else ""
                         waktu_sekarang = get_waktu_wib()
 
+                        # Nama kolom sesuai worksheet "ABNORMAL"
                         row_ab = {
                             "Tanggal":         get_waktu_wib().strftime("%Y-%m-%d"),
-                            "Jam_Input":       waktu_sekarang.strftime("%H:%M:%S"),
+                            "Jam_Input": waktu_sekarang.strftime("%H:%M:%S"),
                             "Mesin":           dp.get('Actual_Line', ''),
                             "Part_No":         dp.get('part_no', ''),
                             "Model":           dp.get('model', ''),
@@ -969,6 +981,7 @@ else:
 
             if st.button("🚀 Kirim Data SPH", use_container_width=True):
                 if act > 0:
+                    # Nama kolom sesuai worksheet "Proses"
                     data_finish = {
                         "Part_No":          dp['part_no'],
                         "Waktu_Selesai":    waktu_end.strftime("%H:%M:%S"),
@@ -1000,6 +1013,7 @@ else:
                 st.divider()
 
                 if st.button("🏁 SELESAI & SCAN PART BARU", type="primary", use_container_width=True):
+                    # FIX 8: tambah ab_counter ke keys_to_reset
                     keys_to_reset = [
                         'status_kerja', 'current_part', 'waktu_start', 'waktu_end',
                         'data_sph_terkirim', 'available_processes', 'sudah_start_diklik',
