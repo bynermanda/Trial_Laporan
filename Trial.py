@@ -746,10 +746,10 @@ else:
                 st.rerun()
 
     # ----------------------------------------------------------
-    # STATUS: SELECTING_PROCESS — pilih urutan proses & actual line
+    # STATUS: SELECTING_PROCESS — pilih urutan proses, line, & condition
     # ----------------------------------------------------------
     elif status_kerja == "SELECTING_PROCESS":
-        st.subheader("🔍 Pilih Urutan Proses")
+        st.subheader("🔍 Pilih Detail Produksi")
         data_pilihan = st.session_state.get('available_processes', [])
 
         list_line_db  = main_df['LINE'].unique().tolist() if 'LINE' in main_df.columns else []
@@ -768,11 +768,19 @@ else:
             }
             data_pilihan.append(dpmr_data)
 
+        # 🟢 Penambahan Pilihan Condition (Normal / Overtime)
+        selected_condition = st.radio(
+            "📌 Pilih Kondisi Kerja (Condition):", 
+            options=["Normal", "Overtime"], 
+            horizontal=True,
+            key="radio_condition"
+        )
+
         actual_line  = st.selectbox("Pilih Line Produksi (Actual Line)", options=list_line)
         opsi_display = {f"{p['URUTAN']} | {p['Part_Name']}": p for p in data_pilihan}
         pilihan_user = st.selectbox("Pilih Urutan Proses Produksi", options=list(opsi_display.keys()))
 
-        if st.button("Konfirmasi & Mulai Kerja"):
+        if st.button("Konfirmasi & Mulai Kerja", use_container_width=True):
             detail = opsi_display[pilihan_user]
             st.session_state.current_part = {
                 "part_no":       detail.get('Part_No', 'N/A'),
@@ -781,7 +789,8 @@ else:
                 "sec_pcs":       detail.get('SEC /PCS', 0),
                 "line":          detail.get('LINE', 'N/A'),
                 "Actual_Line":   actual_line,
-                "urutan_proses": detail.get('URUTAN', 'DPMR')
+                "urutan_proses": detail.get('URUTAN', 'DPMR'),
+                "condition":     selected_condition  # 🟢 Menyimpan status Normal / Overtime
             }
             st.session_state.status_kerja = "RUNNING"
             st.session_state.waktu_start  = get_waktu_wib()
@@ -793,7 +802,7 @@ else:
     elif status_kerja == "RUNNING":
         dp = st.session_state.get('current_part')
         if dp:
-            st.info(f"⚡ **Proses Berjalan:** {dp['part_name']} | {dp['part_no']}")
+            st.info(f"⚡ **Proses Berjalan:** {dp['part_name']} | {dp['part_no']} ({dp.get('condition', 'Normal')})")
             st.write("### Konfirmasi Mulai Kerja")
 
             if not st.session_state.get('sudah_start_diklik'):
@@ -823,11 +832,12 @@ else:
                         "Line":              dp['line'],
                         "Urutan_Proses":     f"'{dp['urutan_proses']}",
                         "Actual_Line":       dp.get('Actual_Line', ""),
+                        "Condition":         dp.get('condition', 'Normal'), # 🟢 Masuk ke kolom Condition di Google Sheets
                         "Sec_Pcs":           dp['sec_pcs'],
-                        "Waktu_Mulai":       "",                   # 🟢 Dikosongkan (blok kuning)
-                        "actual_time_start": jam_manual_str,       # 🟢 Terisi input manual (blok hijau)
-                        "Waktu_Selesai":     "",                   # 🟢 Dikosongkan (blok kuning)
-                        "actual_time_finish": "",                  # Dikosongkan saat START
+                        "Waktu_Mulai":       "",                   
+                        "actual_time_start": jam_manual_str,       
+                        "Waktu_Selesai":     "",                   
+                        "actual_time_finish": "",                  
                         "ACT":               0,
                         "NG":                0,
                         "Status":            "START"
@@ -836,10 +846,10 @@ else:
                         st.session_state.sudah_start_diklik = True
                         st.balloons()
                         time.sleep(1)
-                        st.success(f"✅ Produksi Dimulai pada pukul {jam_manual_str}!")
+                        st.success(f"✅ Produksi Dimulai pada pukul {jam_manual_str} ({dp.get('condition', 'Normal')})!")
                         st.rerun()
             else:
-                st.success("✅ Proses Sudah Dimulai")
+                st.success(f"✅ Proses Sudah Dimulai — Kondisi: **{dp.get('condition', 'Normal')}**")
                 st.info("⚠️ Input ABNORMAL di bawah dan scan KANBAN FINISH untuk akhiri proses.")
                 st.info("DATA START ANDA SUDAH TERSIMPAN DI DATABASE. SELAMAT BEKERJA! 🙌")
 
@@ -848,12 +858,13 @@ else:
             menit_live     = int(durasi_live.total_seconds() / 60)
             jam_live       = round(durasi_live.total_seconds() / 3600, 2)
 
-            col1, col2, col3, col4, col5 = st.columns(5, gap="small")
+            col1, col2, col3, col4, col5, col6 = st.columns(6, gap="small")
             col1.metric("Urutan",          dp['urutan_proses'])
             col2.metric("Target Sec/Pcs",  dp['sec_pcs'])
             col3.metric("Mulai (Start)",   st.session_state.waktu_start.strftime('%H:%M:%S'))
             col4.metric("Sudah Berjalan",  f"{menit_live % 1440} Menit", delta=f"{jam_live % 60} Jam")
             col5.metric("Actual Line",     dp.get('Actual_Line', ''))
+            col6.metric("Kondisi",         dp.get('condition', 'Normal'))
 
             st.divider()
 
@@ -930,7 +941,7 @@ else:
     elif status_kerja == "FINISHING":
         dp = st.session_state.get('current_part')
         if dp:
-            st.subheader(f"📝 Laporan Akhir: {dp['part_name']}")
+            st.subheader(f"📝 Laporan Akhir: {dp['part_name']} ({dp.get('condition', 'Normal')})")
 
             # 1. INPUT QUANTITY ACT & NG
             c1, c2 = st.columns(2)
@@ -997,8 +1008,8 @@ else:
                 if act > 0:
                     data_finish = {
                         "Part_No":            dp['part_no'],
-                        "Waktu_Selesai":      "",                                     # 🟢 Dikosongkan (blok kuning)
-                        "actual_time_finish": dt_actual_finish.strftime("%H:%M:%S"),  # 🟢 Terisi input manual (blok hijau)
+                        "Waktu_Selesai":      "",                                     
+                        "actual_time_finish": dt_actual_finish.strftime("%H:%M:%S"),  
                         "ACT":                act,
                         "NG":                 ng,
                         "%_Prod":             "N/A" if is_repair else f"{persen_prod:.2f}%",
