@@ -799,14 +799,24 @@ else:
             if not st.session_state.get('sudah_start_diklik'):
                 st.warning("⚠️ Silakan tentukan Waktu Start Manual lalu klik tombol di bawah untuk mulai menghitung produksi.")
                 
-                # 🆕 FITUR TAMBAHAN: Input Waktu Manual oleh Operator
+                # 🆕 FIX 1: Gunakan key terpisah agar nilainya terkunci di session state
                 waktu_sekarang_wib = get_waktu_wib()
-                waktu_input_manual = st.time_input("🕒 Pilih Waktu Start Produksi (Manual):", value=waktu_sekarang_wib.time())
+                st.time_input(
+                    "🕒 Pilih Waktu Start Produksi (Manual):", 
+                    value=waktu_sekarang_wib.time(),
+                    key="input_actual_time_start"
+                )
 
                 if st.button("🚀 Konfirmasi Start Proses", use_container_width=True):
-                    # Gabungkan Tanggal hari ini dengan waktu pilihan operator
-                    waktu_start_dt = datetime.combine(date.today(), waktu_input_manual)
+                    # 🆕 FIX 2: Ambil langsung jam dari key widget st.time_input
+                    jam_manual = st.session_state.get('input_actual_time_start', waktu_sekarang_wib.time())
+                    waktu_start_dt = datetime.combine(date.today(), jam_manual)
+                    
+                    # Simpan ke session state sebagai acuan durasi
                     st.session_state.waktu_start = waktu_start_dt
+
+                    # String jam manual (misal: "08:15:00")
+                    jam_manual_str = waktu_start_dt.strftime("%H:%M:%S")
 
                     data_start = {
                         "Tanggal":           date.today().strftime("%Y-%m-%d"),
@@ -819,8 +829,8 @@ else:
                         "Urutan_Proses":     f"'{dp['urutan_proses']}",
                         "Actual_Line":       dp.get('Actual_Line', ""),
                         "Sec_Pcs":           dp['sec_pcs'],
-                        "Waktu_Mulai":       waktu_start_dt.strftime("%H:%M:%S"),
-                        "actual_time_start": waktu_start_dt.strftime("%H:%M:%S"),  # 🆕 Kolom Baru tersimpan di GSheet
+                        "Waktu_Mulai":       jam_manual_str,       # Menggunakan jam manual
+                        "actual_time_start": jam_manual_str,       # 🟢 FIX: Mengunci inputan manual ke kolom actual_time_start
                         "Waktu_Selesai":     "",
                         "ACT":               0,
                         "NG":                0,
@@ -830,7 +840,7 @@ else:
                         st.session_state.sudah_start_diklik = True
                         st.balloons()
                         time.sleep(1)
-                        st.success("✅ Produksi Dimulai!")
+                        st.success(f"✅ Produksi Dimulai pada pukul {jam_manual_str}!")
                         st.rerun()
             else:
                 st.success("✅ Proses Sudah Dimulai")
