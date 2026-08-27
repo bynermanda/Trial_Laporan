@@ -22,7 +22,6 @@ def safe_gsheet_update(conn, spreadsheet, worksheet, data, max_retries=4):
     Wrapper conn.update dengan exponential backoff + jitter.
     Menangani 429 Quota Exceeded dan 500/503 Server Error.
     """
-    # 🛡️ GUARD: Cegah penghapusan tidak sengaja jika DataFrame kosong
     if data is None:
         st.error("❌ Gagal menyimpan: Data bernilai None!")
         return False
@@ -201,10 +200,6 @@ def get_waktu_wib():
 
 
 def get_checkin_datetime(checkin_row, waktu_out):
-    """
-    Parse Check-In datetime, handle cross-midnight shift.
-    Nama kolom sesuai sheet: 'Tanggal', 'Check-In'.
-    """
     tgl_in = checkin_row['Tanggal']
     jam_in = checkin_row['Check-In']
     try:
@@ -227,7 +222,7 @@ if 'waktu_start' not in st.session_state:
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Load Master_Karyawan sekali per session — kolom: NIK
+# Load Master_Karyawan sekali per session
 if 'list_nik_terdaftar' not in st.session_state:
     try:
         df_karyawan = safe_gsheet_read(conn, URL_KITA, "Master_Karyawan", ttl=3600)
@@ -272,18 +267,13 @@ except Exception as e:
     main_df = pd.DataFrame()
 
 # ============================================================
-# FUNGSI SIMPAN KE SHEET — semua pakai safe_gsheet_update
+# FUNGSI SIMPAN KE SHEET
 # ============================================================
 def simpan_ke_sheet(data_dict, tipe):
-    """
-    tipe: "START" | "FINISH" | "ABNORMAL"
-    Semua nama key di data_dict harus sesuai nama kolom di GSheet.
-    """
     try:
         if tipe == "START":
             df_proses = read_proses_sheet(URL_KITA).copy()
 
-            # Cek duplikat START untuk operator yang sama
             double_check = df_proses[
                 (df_proses['Nama'] == data_dict['Nama']) &
                 (df_proses['Status'] == 'START')
@@ -300,7 +290,6 @@ def simpan_ke_sheet(data_dict, tipe):
         elif tipe == "FINISH":
             df_proses = read_proses_sheet(URL_KITA).copy()
 
-            # Konversi kolom angka ke object agar bisa diisi string/float campuran
             kolom_angka = ['Total_Jam', 'Rasio_NG', '%_Prod', 'ACT']
             for col in kolom_angka:
                 if col in df_proses.columns:
@@ -316,14 +305,16 @@ def simpan_ke_sheet(data_dict, tipe):
 
             if mask.any():
                 idx = df_proses[mask].index[-1]
-                df_proses.at[idx, 'Waktu_Selesai']   = data_dict['Waktu_Selesai']
-                df_proses.at[idx, 'ACT']              = data_dict['ACT']
-                df_proses.at[idx, 'NG']               = data_dict['NG']
-                df_proses.at[idx, '%_Prod']           = data_dict['%_Prod']
-                df_proses.at[idx, 'Total Istirahat']  = data_dict['Total Istirahat']
-                df_proses.at[idx, 'Rasio_NG']         = data_dict['Rasio_NG']
-                df_proses.at[idx, 'Total_Jam']        = data_dict['Total_Jam']
-                df_proses.at[idx, 'Status']           = 'FINISH'
+                # 🟢 Disesuaikan: Waktu_Selesai dikosongkan, actual_time_finish diisi nilai manual
+                df_proses.at[idx, 'Waktu_Selesai']     = ""
+                df_proses.at[idx, 'actual_time_finish'] = data_dict['actual_time_finish']
+                df_proses.at[idx, 'ACT']                = data_dict['ACT']
+                df_proses.at[idx, 'NG']                 = data_dict['NG']
+                df_proses.at[idx, '%_Prod']             = data_dict['%_Prod']
+                df_proses.at[idx, 'Total Istirahat']    = data_dict['Total Istirahat']
+                df_proses.at[idx, 'Rasio_NG']           = data_dict['Rasio_NG']
+                df_proses.at[idx, 'Total_Jam']          = data_dict['Total_Jam']
+                df_proses.at[idx, 'Status']             = 'FINISH'
 
                 safe_gsheet_update(conn, URL_KITA, "Proses", df_proses)
                 read_proses_sheet.clear()
@@ -423,8 +414,14 @@ def handle_scan():
                 'sec_pcs':        match_main.iloc[0]['SEC /PCS'] if not match_main.empty else 0
             }
 
-            dt_str = f"{row_terakhir['Tanggal']} {row_terakhir['Waktu_Mulai']}"
-            st.session_state.waktu_start = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
+            # Prioritaskan pembacaan jam dari actual_time_start jika Waktu_Mulai kosong
+            waktu_str = str(row_terakhir.get('actual_time_start') or row_terakhir.get('Waktu_Mulai', ''))
+            dt_str = f"{row_terakhir['Tanggal']} {waktu_str}"
+            try:
+                st.session_state.waktu_start = datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S")
+            except Exception:
+                st.session_state.waktu_start = get_waktu_wib()
+
             st.session_state.status_kerja = "RUNNING"
             st.success(f"🔄 Sesi {p_no} dipulihkan!")
             st.session_state.barcode_input = ""
@@ -540,7 +537,7 @@ if not nama_karyawan:
                     }
 
                     try:
-                        waktu_str = str(data_aktif['Waktu_Mulai'])
+                        waktu_str = str(data_aktif.get('actual_time_start') or data_aktif.get('Waktu_Mulai', ''))
                         if " " in waktu_str:
                             waktu_str = waktu_str.split(" ")[1]
                         jam_obj = datetime.strptime(waktu_str, "%H:%M:%S").time()
@@ -795,11 +792,9 @@ else:
             st.info(f"⚡ **Proses Berjalan:** {dp['part_name']} | {dp['part_no']}")
             st.write("### Konfirmasi Mulai Kerja")
 
-            # Tombol START — hanya muncul jika belum diklik
             if not st.session_state.get('sudah_start_diklik'):
                 st.warning("⚠️ Silakan tentukan Waktu Start Manual lalu klik tombol di bawah untuk mulai menghitung produksi.")
                 
-                # 🆕 FIX 1: Gunakan key terpisah agar nilainya terkunci di session state
                 waktu_sekarang_wib = get_waktu_wib()
                 st.time_input(
                     "🕒 Pilih Waktu Start Produksi (Manual):", 
@@ -808,14 +803,10 @@ else:
                 )
 
                 if st.button("🚀 Konfirmasi Start Proses", use_container_width=True):
-                    # 🆕 FIX 2: Ambil langsung jam dari key widget st.time_input
                     jam_manual = st.session_state.get('input_actual_time_start', waktu_sekarang_wib.time())
                     waktu_start_dt = datetime.combine(date.today(), jam_manual)
                     
-                    # Simpan ke session state sebagai acuan durasi
                     st.session_state.waktu_start = waktu_start_dt
-
-                    # String jam manual (misal: "08:15:00")
                     jam_manual_str = waktu_start_dt.strftime("%H:%M:%S")
 
                     data_start = {
@@ -829,9 +820,10 @@ else:
                         "Urutan_Proses":     f"'{dp['urutan_proses']}",
                         "Actual_Line":       dp.get('Actual_Line', ""),
                         "Sec_Pcs":           dp['sec_pcs'],
-                        "Waktu_Mulai":       jam_manual_str,       # Menggunakan jam manual
-                        "actual_time_start": jam_manual_str,       # 🟢 FIX: Mengunci inputan manual ke kolom actual_time_start
-                        "Waktu_Selesai":     "",
+                        "Waktu_Mulai":       "",                   # 🟢 Dikosongkan (blok kuning)
+                        "actual_time_start": jam_manual_str,       # 🟢 Terisi input manual (blok hijau)
+                        "Waktu_Selesai":     "",                   # 🟢 Dikosongkan (blok kuning)
+                        "actual_time_finish": "",                  # Dikosongkan saat START
                         "ACT":               0,
                         "NG":                0,
                         "Status":            "START"
@@ -847,13 +839,11 @@ else:
                 st.info("⚠️ Input ABNORMAL di bawah dan scan KANBAN FINISH untuk akhiri proses.")
                 st.info("DATA START ANDA SUDAH TERSIMPAN DI DATABASE. SELAMAT BEKERJA! 🙌")
 
-            # Hitung durasi live dari waktu_start (termasuk waktu_start manual jika diubah)
             waktu_sekarang = get_waktu_wib()
             durasi_live    = waktu_sekarang - st.session_state.waktu_start.replace(tzinfo=None)
             menit_live     = int(durasi_live.total_seconds() / 60)
             jam_live       = round(durasi_live.total_seconds() / 3600, 2)
 
-            # Metric cards
             col1, col2, col3, col4, col5 = st.columns(5, gap="small")
             col1.metric("Urutan",          dp['urutan_proses'])
             col2.metric("Target Sec/Pcs",  dp['sec_pcs'])
@@ -958,20 +948,15 @@ else:
                 key="input_actual_time_finish"
             )
 
-            # Gabungkan tanggal hari ini dengan jam pilihan operator
             dt_actual_finish = datetime.combine(date.today(), waktu_finish_manual)
-
-            # 3. AMBIL WAKTU START ACTUAL (actual_time_start) DARI SESSION STATE
             dt_actual_start = st.session_state.get('waktu_start', get_waktu_wib()).replace(tzinfo=None)
             
-            # Penanganan jika jam finish melewati tengah malam dibanding jam start
             if dt_actual_finish < dt_actual_start:
                 dt_actual_finish = dt_actual_finish + timedelta(days=1)
 
-            # Hitung total durasi aktual kotor dalam menit
             durasi_kotor_menit = (dt_actual_finish - dt_actual_start).total_seconds() / 60
 
-            # 4. POTONGAN WAKTU ISTIRAHAT
+            # 3. POTONGAN WAKTU ISTIRAHAT
             st.write("### ☕ Potongan Waktu Istirahat")
             DAFTAR_BREAK = {
                 "Break 1 (10m)":            10,
@@ -985,33 +970,31 @@ else:
             extra_custom   = st.number_input("Lainnya (Menit)", min_value=0, step=1, value=0)
             total_potongan = sum(DAFTAR_BREAK[item] for item in pilihan_break) + extra_custom
 
-            # 5. PERHITUNGAN DURASI BERSIH & TOTAL WAKTU ACTUAL
+            # 4. PERHITUNGAN DURASI BERSIH & TOTAL WAKTU ACTUAL
             durasi_bersih_menit = max(0.0, durasi_kotor_menit - total_potongan)
             total_jam_actual    = durasi_bersih_menit / 60
 
-            # Tampilan string untuk Ringkasan Hasil Produksi
             jam_display   = int(durasi_bersih_menit // 60)
             menit_display = int(durasi_bersih_menit % 60)
             total_waktu_actual_str = f"{jam_display} Jam {menit_display} Menit"
 
-            # Perhitungan Efisiensi/Persentase Produksi berdasarkan waktu aktual bersih
             is_repair     = (dp.get('urutan_proses') == "DPMR")
             val_sec_pcs   = float(dp.get('sec_pcs', 0))
             standar_input = (val_sec_pcs * act) / 60 if (act > 0 and not is_repair) else 0
             persen_prod   = round((standar_input / durasi_bersih_menit) * 100, 2) if (durasi_bersih_menit > 0 and not is_repair) else 0.0
             rasio_ng      = (ng / act * 100) if (act > 0 and not is_repair) else 0.0
 
-            st.info(f"⏱️ **Waktu Start:** {dt_actual_start.strftime('%H:%M:%S')} | **Waktu Finish:** {dt_actual_finish.strftime('%H:%M:%S')} | **Durasi Bersih:** {durasi_bersih_menit:.1f} Menit")
+            st.info(f"⏱️ **Waktu Start:** {dt_actual_start.strftime('%H:%M:%S')}")
 
             st.divider()
 
-            # 6. TOMBOL SIMPAN / KIRIM DATA SPH
+            # 5. TOMBOL SIMPAN / KIRIM DATA SPH
             if st.button("🚀 Kirim Data SPH", use_container_width=True):
                 if act > 0:
                     data_finish = {
                         "Part_No":            dp['part_no'],
-                        "Waktu_Selesai":      dt_actual_finish.strftime("%H:%M:%S"),
-                        "actual_time_finish": dt_actual_finish.strftime("%H:%M:%S"),  # 🆕 Tersimpan ke kolom actual_time_finish
+                        "Waktu_Selesai":      "",                                     # 🟢 Dikosongkan (blok kuning)
+                        "actual_time_finish": dt_actual_finish.strftime("%H:%M:%S"),  # 🟢 Terisi input manual (blok hijau)
                         "ACT":                act,
                         "NG":                 ng,
                         "%_Prod":             "N/A" if is_repair else f"{persen_prod:.2f}%",
@@ -1034,7 +1017,7 @@ else:
                 else:
                     st.error("⚠️ Jumlah ACT harus diisi dan lebih dari 0!")
 
-            # 7. RINGKASAN HASIL PRODUKSI (Menggunakan total_waktu_actual)
+            # 6. RINGKASAN HASIL PRODUKSI
             if st.session_state.get('data_sph_terkirim'):
                 st.divider()
                 st.subheader("📊 Ringkasan Hasil Produksi")
@@ -1068,7 +1051,7 @@ else:
                     st.rerun()
 
     # ----------------------------------------------------------
-    # Tombol Reset di bagian bawah — selalu tampil saat logged in
+    # Tombol Reset di bagian bawah
     # ----------------------------------------------------------
     if st.session_state.get('status_kerja') == "RUNNING":
         col_ref, col_res = st.columns(2)
