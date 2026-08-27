@@ -921,20 +921,15 @@ else:
                     handle_scan()
 
     # ----------------------------------------------------------
-    # STATUS: FINISHING — input ACT, NG, istirahat, kirim SPH
+    # STATUS: FINISHING — input ACT, NG, Waktu Finish Manual, Istirahat, Kirim SPH
     # ----------------------------------------------------------
     elif status_kerja == "FINISHING":
         dp = st.session_state.get('current_part')
         if dp:
             st.subheader(f"📝 Laporan Akhir: {dp['part_name']}")
 
-            waktu_start = st.session_state.get('waktu_start', get_waktu_wib())
-            waktu_end   = st.session_state.get('waktu_end',   get_waktu_wib())
-            durasi      = waktu_end.replace(tzinfo=None) - waktu_start.replace(tzinfo=None)
-            jam_total   = durasi.total_seconds() / 60
-            jam_bersih  = jam_total % 1440
-
-            c1, c2, c3, c4 = st.columns(4)
+            # 1. INPUT QUANTITY ACT & NG
+            c1, c2 = st.columns(2)
             act_raw = c1.text_input("Jumlah ACT", value="0")
             ng_raw  = c2.text_input("Jumlah NG",  value="0")
             try:
@@ -944,9 +939,29 @@ else:
                 act = 0
                 ng  = 0
 
-            c3.metric("Durasi",      f"{round(jam_total, 2)} Menit", delta=f"{round(jam_total/60, 2)} Jam")
-            c4.metric("Waktu Start", st.session_state.waktu_start.strftime("%H:%M:%S"))
+            # 2. INPUT WAKTU FINISH MANUAL (actual_time_finish)
+            st.write("### 🕒 Input Waktu Selesai Produksi (Manual)")
+            waktu_sekarang_wib = get_waktu_wib()
+            waktu_finish_manual = st.time_input(
+                "Pilih Waktu Finish Produksi:", 
+                value=waktu_sekarang_wib.time(),
+                key="input_actual_time_finish"
+            )
 
+            # Gabungkan tanggal hari ini dengan jam pilihan operator
+            dt_actual_finish = datetime.combine(date.today(), waktu_finish_manual)
+
+            # 3. AMBIL WAKTU START ACTUAL (actual_time_start) DARI SESSION STATE
+            dt_actual_start = st.session_state.get('waktu_start', get_waktu_wib()).replace(tzinfo=None)
+            
+            # Penanganan jika jam finish melewati tengah malam dibanding jam start
+            if dt_actual_finish < dt_actual_start:
+                dt_actual_finish = dt_actual_finish + timedelta(days=1)
+
+            # Hitung total durasi aktual kotor dalam menit
+            durasi_kotor_menit = (dt_actual_finish - dt_actual_start).total_seconds() / 60
+
+            # 4. POTONGAN WAKTU ISTIRAHAT
             st.write("### ☕ Potongan Waktu Istirahat")
             DAFTAR_BREAK = {
                 "Break 1 (10m)":            10,
@@ -956,45 +971,71 @@ else:
                 "2S (15m)":                 15,
                 "Istirahat Jumat (70m)":    70
             }
-            pilihan_break  = st.multiselect("Pilih:", options=list(DAFTAR_BREAK.keys()))
+            pilihan_break  = st.multiselect("Pilih Break:", options=list(DAFTAR_BREAK.keys()))
             extra_custom   = st.number_input("Lainnya (Menit)", min_value=0, step=1, value=0)
             total_potongan = sum(DAFTAR_BREAK[item] for item in pilihan_break) + extra_custom
-            durasi_bersih  = max(0, jam_bersih - total_potongan)
-            st.info(f"⏱️ Durasi Bersih: {durasi_bersih:.1f} Menit")
 
-            is_repair    = (dp.get('urutan_proses') == "DPMR")
-            val_sec_pcs  = float(dp.get('sec_pcs', 0))
+            # 5. PERHITUNGAN DURASI BERSIH & TOTAL WAKTU ACTUAL
+            durasi_bersih_menit = max(0.0, durasi_kotor_menit - total_potongan)
+            total_jam_actual    = durasi_bersih_menit / 60
+
+            # Tampilan string untuk Ringkasan Hasil Produksi
+            jam_display   = int(durasi_bersih_menit // 60)
+            menit_display = int(durasi_bersih_menit % 60)
+            total_waktu_actual_str = f"{jam_display} Jam {menit_display} Menit"
+
+            # Perhitungan Efisiensi/Persentase Produksi berdasarkan waktu aktual bersih
+            is_repair     = (dp.get('urutan_proses') == "DPMR")
+            val_sec_pcs   = float(dp.get('sec_pcs', 0))
             standar_input = (val_sec_pcs * act) / 60 if (act > 0 and not is_repair) else 0
-            persen_prod  = round((standar_input / durasi_bersih) * 100, 2) if (durasi_bersih > 0 and not is_repair) else 0.0
+            persen_prod   = round((standar_input / durasi_bersih_menit) * 100, 2) if (durasi_bersih_menit > 0 and not is_repair) else 0.0
+            rasio_ng      = (ng / act * 100) if (act > 0 and not is_repair) else 0.0
 
+            st.info(f"⏱️ **Waktu Start:** {dt_actual_start.strftime('%H:%M:%S')} | **Waktu Finish:** {dt_actual_finish.strftime('%H:%M:%S')} | **Durasi Bersih:** {durasi_bersih_menit:.1f} Menit")
+
+            st.divider()
+
+            # 6. TOMBOL SIMPAN / KIRIM DATA SPH
             if st.button("🚀 Kirim Data SPH", use_container_width=True):
                 if act > 0:
                     data_finish = {
-                        "Part_No":          dp['part_no'],
-                        "Waktu_Selesai":    waktu_end.strftime("%H:%M:%S"),
-                        "ACT":              act,
-                        "NG":               ng,
-                        "%_Prod":           "N/A" if is_repair else f"{persen_prod:.2f}%",
-                        "Total Istirahat":  total_potongan,
-                        "Rasio_NG":         "N/A" if is_repair else (f"{(ng/act*100):.2f}%" if act > 0 else "0%"),
-                        "Total_Jam":        round(durasi_bersih / 60, 2),
-                        "Status":           "FINISH"
+                        "Part_No":            dp['part_no'],
+                        "Waktu_Selesai":      dt_actual_finish.strftime("%H:%M:%S"),
+                        "actual_time_finish": dt_actual_finish.strftime("%H:%M:%S"),  # 🆕 Tersimpan ke kolom actual_time_finish
+                        "ACT":                act,
+                        "NG":                 ng,
+                        "%_Prod":             "N/A" if is_repair else f"{persen_prod:.2f}%",
+                        "Total Istirahat":    total_potongan,
+                        "Rasio_NG":           "N/A" if is_repair else f"{rasio_ng:.2f}%",
+                        "Total_Jam":          round(total_jam_actual, 2),
+                        "Status":             "FINISH"
                     }
                     if simpan_ke_sheet(data_finish, "FINISH"):
                         st.session_state.data_sph_terkirim = True
+                        st.session_state.actual_summary_data = {
+                            "total_waktu_actual": total_waktu_actual_str,
+                            "persen_prod": persen_prod,
+                            "total_jam": round(total_jam_actual, 2),
+                            "rasio_ng": rasio_ng,
+                            "is_repair": is_repair
+                        }
                         st.success("✅ SPH Terkirim!")
-                        st.info("Data SPH sudah tersimpan, Scroll ke bawah untuk scan part baru atau reset scanner.")
+                        st.info("Data SPH sudah tersimpan. Scroll ke bawah untuk melihat ringkasan atau reset scanner.")
                 else:
                     st.error("⚠️ Jumlah ACT harus diisi dan lebih dari 0!")
 
+            # 7. RINGKASAN HASIL PRODUKSI (Menggunakan total_waktu_actual)
             if st.session_state.get('data_sph_terkirim'):
                 st.divider()
                 st.subheader("📊 Ringkasan Hasil Produksi")
 
-                c1, c2, c3 = st.columns(3, gap="medium")
-                c1.metric("Persentase Produksi", f"{persen_prod:.2f} %")
-                c2.metric("Total Jam Kerja",      f"{round(durasi_bersih/60, 2)} Jam")
-                c3.metric("Rasio NG",              f"{(ng/act * 100) if act > 0 else 0:.2f} %")
+                summary = st.session_state.get('actual_summary_data', {})
+
+                col_res1, col_res2, col_res3, col_res4 = st.columns(4, gap="medium")
+                col_res1.metric("total_waktu_actual", summary.get("total_waktu_actual", "-"))
+                col_res2.metric("Persentase Produksi", "N/A" if summary.get("is_repair") else f"{summary.get('persen_prod', 0):.2f} %")
+                col_res3.metric("Total Jam Kerja", f"{summary.get('total_jam', 0)} Jam")
+                col_res4.metric("Rasio NG", "N/A" if summary.get("is_repair") else f"{summary.get('rasio_ng', 0):.2f} %")
 
                 st.info("✅ Data SPH sudah tercatat di database.")
                 st.divider()
@@ -1004,7 +1045,7 @@ else:
                         'status_kerja', 'current_part', 'waktu_start', 'waktu_end',
                         'data_sph_terkirim', 'available_processes', 'sudah_start_diklik',
                         'barcode_input', 'is_submitting', 'proses_data', 'abnormal_data',
-                        'ab_counter'
+                        'ab_counter', 'actual_summary_data'
                     ]
                     for k in keys_to_reset:
                         if k in st.session_state:
