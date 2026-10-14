@@ -1,8 +1,5 @@
-streamlit
+streamlit>=1.50
 pandas
-st-gsheets-connection
-pytz
-gspread
+supabase>=2.10
 streamlit-qrcode-scanner
-oauth2client
-supabase
+tzdata
