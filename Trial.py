@@ -516,8 +516,7 @@ elif tahap == "RUNNING":
         with kanan:
             with st.container(key="card_manual_finish"):
                 ui.judul("Input Manual Finish")
-                manual_finish = st.text_input("Part No.", key="manual_part_finish_input",
-                                              placeholder=dp["part_no"]).strip().upper()
+                manual_finish = st.text_input("Part No.", key="manual_part_finish_input").strip().upper()
                 if st.button("FINISH ➜", key="btn_manual_finish", type="primary", width="stretch") and manual_finish:
                     handle_scan(manual_finish)
 

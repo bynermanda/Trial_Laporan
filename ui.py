@@ -218,6 +218,21 @@ hr {{ border-color:var(--border) !important; margin:.8rem 0 !important; }}
 .kpi.bad {{ border-color:rgba(239,68,68,.5); }}      .kpi.bad .val {{ color:var(--danger); }}
 .kpi.hero .val {{ font-size:34px; }}
 
+.part-card {{ background:var(--surface); border:1px solid var(--border); border-left:6px solid var(--ok);
+  border-radius:var(--radius); padding:14px 16px; margin-bottom:8px; }}
+.part-card .lbl {{ font-size:12px; font-weight:800; letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); }}
+.part-name {{ font-size:clamp(22px, 5vw, 34px); font-weight:800; line-height:1.15; margin:4px 0 10px;
+  overflow-wrap:anywhere; }}
+.part-meta {{ display:grid; grid-template-columns:repeat(auto-fit, minmax(110px, 1fr)); gap:8px; margin-bottom:10px; }}
+.part-meta div {{ background:var(--surface-2); border-radius:10px; padding:6px 10px; min-width:0; }}
+.part-meta span {{ display:block; font-size:11px; font-weight:800; letter-spacing:1px; text-transform:uppercase; color:var(--muted); }}
+.part-meta b {{ display:block; font-family:var(--mono); font-size:17px; font-weight:700; overflow-wrap:anywhere; }}
+.badges {{ display:flex; gap:8px; flex-wrap:wrap; }}
+.badges .b {{ font-size:13px; font-weight:800; letter-spacing:1px; padding:5px 12px; border-radius:999px;
+  border:1.5px solid var(--border-strong); color:var(--text); }}
+.badges .b.ot {{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }}
+.badges .b.nm {{ border-color:var(--ok); color:var(--ok); }}
+
 @media (max-width:640px) {{
   .block-container {{ padding:.5rem .6rem 3rem !important; }}
   .kpi .val {{ font-size:22px; }} .kpi.hero .val {{ font-size:28px; }}
@@ -291,54 +306,52 @@ def kpi_grid(items: list[tuple]) -> None:
 
 def panel_produksi(dp: dict, waktu_start: datetime, sudah_start: bool) -> None:
     """
-    Panel utama saat RUNNING: nama part besar + timer live.
-    Timer berjalan di browser (tanpa rerun) dan dikoreksi ke jam server.
+    Panel utama saat RUNNING.
+      1. Kartu info part: HTML biasa, tingginya mengikuti isi → tidak ada teks yang terpotong/tertumpuk.
+      2. Bar timer live: iframe kecil, berdetak di browser (tanpa rerun) dan dikoreksi ke jam server.
     """
     overtime = dp.get("condition") == "Overtime"
+    warna = ACCENT if overtime else OK
+    st.markdown(
+        f"""
+        <div class="part-card" style="border-left-color:{warna}">
+          <div class="lbl">Part aktif</div>
+          <div class="part-name">{esc(dp.get('part_name'))}</div>
+          <div class="part-meta">
+            <div><span>Part No</span><b>{esc(dp.get('part_no'))}</b></div>
+            <div><span>Model</span><b>{esc(dp.get('model') or '-')}</b></div>
+            <div><span>Urutan</span><b>{esc(dp.get('urutan_proses'))}</b></div>
+          </div>
+          <div class="badges">
+            <span class="b {'ot' if overtime else 'nm'}">{'OVERTIME' if overtime else 'NORMAL'}</span>
+            <span class="b">LINE {esc(dp.get('Actual_Line') or '-')}</span>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     start_ms = int(waktu_start.timestamp() * 1000)
     server_ms = int(time.time() * 1000)
-    label_timer = "WAKTU BERJALAN" if sudah_start else "MENUNGGU START"
     warna_timer = OK if sudah_start else MUTED
-
     doc = f"""
 <style>
 {FONT_IMPORT}
 * {{ box-sizing:border-box; margin:0; padding:0; }}
 body {{ background:transparent; font-family:'Barlow', system-ui, sans-serif; color:{TEXT}; }}
-.wrap {{ display:flex; gap:14px; align-items:stretch; background:{SURFACE};
-  border:1px solid {BORDER}; border-left:6px solid {ACCENT if overtime else OK};
-  border-radius:14px; padding:14px 16px; height:146px; }}
-.l {{ flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center; gap:6px; }}
-.lbl {{ font-size:12px; font-weight:800; letter-spacing:1.2px; color:{MUTED}; text-transform:uppercase; }}
-.name {{ font-size:clamp(18px, 3.4vw, 30px); font-weight:800; line-height:1.1;
-  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }}
-.meta {{ font-family:'JetBrains Mono', monospace; font-size:clamp(12px, 2vw, 15px); color:{MUTED};
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
-.badges {{ display:flex; gap:6px; flex-wrap:wrap; }}
-.b {{ font-size:12px; font-weight:800; letter-spacing:1px; padding:4px 9px; border-radius:999px;
-  border:1.5px solid {BORDER_STRONG}; color:{TEXT}; }}
-.b.ot {{ background:{ACCENT}; color:{ACCENT_INK}; border-color:{ACCENT}; }}
-.b.nm {{ border-color:{OK}; color:{OK}; }}
-.r {{ display:flex; flex-direction:column; justify-content:center; align-items:flex-end; text-align:right; }}
+.bar {{ display:flex; align-items:center; justify-content:space-between; gap:12px;
+  background:{SURFACE}; border:1px solid {BORDER}; border-radius:14px; padding:10px 16px; height:84px; }}
+.lbl {{ font-size:12px; font-weight:800; letter-spacing:1.2px; color:{MUTED}; text-transform:uppercase; white-space:nowrap; }}
+.since {{ font-size:14px; color:{TEXT}; margin-top:4px; font-family:'JetBrains Mono', monospace; white-space:nowrap; }}
 .timer {{ font-family:'JetBrains Mono', monospace; font-weight:700; color:{warna_timer};
-  font-size:clamp(30px, 7vw, 58px); line-height:1; letter-spacing:1px; font-variant-numeric:tabular-nums; }}
-.since {{ font-size:13px; color:{MUTED}; margin-top:6px; font-family:'JetBrains Mono', monospace; }}
+  font-size:clamp(30px, 9vw, 54px); line-height:1; font-variant-numeric:tabular-nums; white-space:nowrap; }}
 </style>
-<div class="wrap">
-  <div class="l">
-    <div class="lbl">Part aktif · Urutan {esc(dp.get('urutan_proses'))}</div>
-    <div class="name">{esc(dp.get('part_name'))}</div>
-    <div class="meta">{esc(dp.get('part_no'))} · {esc(dp.get('model'))}</div>
-    <div class="badges">
-      <span class="b {'ot' if overtime else 'nm'}">{'OVERTIME' if overtime else 'NORMAL'}</span>
-      <span class="b">LINE {esc(dp.get('Actual_Line') or '-')}</span>
-    </div>
+<div class="bar">
+  <div>
+    <div class="lbl">{'Waktu berjalan' if sudah_start else 'Menunggu start'}</div>
+    <div class="since">{'Mulai ' + waktu_start.strftime('%H:%M') if sudah_start else 'Tekan MULAI'}</div>
   </div>
-  <div class="r">
-    <div class="lbl">{label_timer}</div>
-    <div class="timer" id="t">{'00:00:00' if sudah_start else '--:--:--'}</div>
-    <div class="since">{'Mulai ' + waktu_start.strftime('%H:%M') if sudah_start else 'Tekan START di bawah'}</div>
-  </div>
+  <div class="timer" id="t">{'00:00:00' if sudah_start else '--:--:--'}</div>
 </div>
 <script>
   const START = {start_ms}, OFFSET = {server_ms} - Date.now(), JALAN = {'true' if sudah_start else 'false'};
@@ -351,4 +364,4 @@ body {{ background:transparent; font-family:'Barlow', system-ui, sans-serif; col
   tick(); setInterval(tick, 1000);
 </script>
 """
-    components.html(doc, height=152)
+    components.html(doc, height=90)
