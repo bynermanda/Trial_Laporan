@@ -16,9 +16,30 @@ import streamlit as st
 import streamlit.components.v1 as components
 from streamlit_qrcode_scanner import qrcode_scanner
 
+import importlib
+import os
+
 import db
 import ui
-from db import DBError, DuplicateError, combine_wib, normalize_nik, now_wib, parse_ts
+
+
+def _muat_ulang_jika_berubah(*modul) -> None:
+    """
+    Streamlit Cloud kadang tetap memakai versi lama modul (db.py, ui.py) di memori
+    setelah kode baru di-push. Muat ulang modul yang file-nya berubah.
+    """
+    for m in modul:
+        try:
+            mtime = os.path.getmtime(m.__file__)
+        except OSError:
+            continue
+        if getattr(m, "_mtime_dimuat", mtime) != mtime:
+            m = importlib.reload(m)
+        m._mtime_dimuat = mtime
+
+
+_muat_ulang_jika_berubah(db, ui)
+from db import DBError, DuplicateError, combine_wib, normalize_nik, now_wib, parse_ts  # noqa: E402
 
 # set_page_config WAJIB jadi perintah Streamlit pertama
 st.set_page_config(
@@ -265,6 +286,7 @@ ui.topbar(tahap, nama_karyawan, nik_karyawan)
 # ============================================================
 if tahap == "ADMIN":
     import laporan_admin
+    _muat_ulang_jika_berubah(laporan_admin)
     laporan_admin.tampilkan()
 
 elif tahap == "LOGIN":
