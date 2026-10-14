@@ -1,13 +1,13 @@
 """
 Laporan Produksi Dept. Press — PT Indosafety Sentosa
-Versi Supabase (pengganti Google Sheets).
+Versi Supabase · tampilan "Industrial Dark / Operator Terminal".
 
 Alur layar:
   1. Scan ID Operator
   2. Check-In
   3. Area produksi: IDLE → SELECTING_PROCESS → RUNNING → FINISHING
 
-Semua akses database ada di db.py.
+Akses database ada di db.py, tema & komponen tampilan di ui.py.
 """
 import time
 import uuid
@@ -18,10 +18,16 @@ import streamlit.components.v1 as components
 from streamlit_qrcode_scanner import qrcode_scanner
 
 import db
+import ui
 from db import DBError, DuplicateError, combine_wib, normalize_nik, now_wib, parse_ts
 
 # set_page_config WAJIB jadi perintah Streamlit pertama
-st.set_page_config(page_title="Laporan Produksi Press PT. ISI", layout="wide")
+st.set_page_config(
+    page_title="Press Terminal · PT ISI",
+    page_icon="🏭",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 
 
 # ============================================================
@@ -38,12 +44,12 @@ FALLBACK_KODE_ABNORMAL = [
 FALLBACK_LINE = ["BM", "CM", "DM", "ERM", "NRM", "IRM", "KRM"]
 
 DAFTAR_BREAK = {
-    "Break 1 (10m)":         10,
-    "Break 2 (10m)":         10,
-    "Istirahat (40m)":       40,
-    "Extra Break (15m)":     15,
-    "2S (15m)":              15,
-    "Istirahat Jumat (70m)": 70,
+    "Break 1 · 10m":        10,
+    "Break 2 · 10m":        10,
+    "Istirahat · 40m":      40,
+    "Extra Break · 15m":    15,
+    "2S · 15m":             15,
+    "Ist. Jumat · 70m":     70,
 }
 
 KEYS_PROSES = [
@@ -56,8 +62,10 @@ KEYS_OPERATOR = ["nama_terpilih", "nik_karyawan", "shift"] + KEYS_PROSES
 
 
 # ============================================================
-# JAVASCRIPT — cegah refresh tidak sengaja
+# TEMA & PENGAMAN REFRESH
 # ============================================================
+ui.terapkan_tema()
+
 components.html(
     """
     <script>
@@ -71,96 +79,9 @@ components.html(
     height=0,
 )
 
-# ============================================================
-# CSS STYLING (sama dengan versi Google Sheets)
-# ============================================================
-st.markdown("""
-    <style>
-    .block-container { padding-top: 1.5rem !important; }
-    header { visibility: hidden; }
-    h1 { margin-top: -10px !important; padding-top: 0px !important;
-         margin-bottom: 5px !important; line-height: 1.1 !important; }
-    .stApp { background-color: #261ad6; }
-    [data-testid="stSidebar"] { background-color: #b30000; }
-    h1, h2, h3, p, span, label, .stMarkdown { color: #ffffff !important; }
-    div.stButton > button {
-        background-color: #00FF00 !important; color: black !important;
-        border-radius: 10px; font-weight: bold !important;
-    }
-    div.stButton > button p { font-size: 18px !important; font-weight: bold !important; color: black !important; }
-    div.stMarkdown p { font-size: 16px !important; font-weight: normal !important;
-                       line-height: 1.5 !important; font-family: sans-serif !important; }
-    hr { margin-top: 0.5rem !important; margin-bottom: 0.5rem !important;
-         border-bottom: 1px solid rgba(255, 255, 255, 0.3) !important; }
-    div[data-testid="stTextInput"] input { background-color: #000000 !important; color: #ffffff !important;
-                                           -webkit-text-fill-color: #ffffff !important; }
-    div[data-testid="stNumberInput"] input { background-color: #000000 !important; color: #ffffff !important; }
-    div[data-testid="stSelectbox"] div[data-baseweb="select"] { background-color: #000000 !important; color: #ffffff !important; }
-    div[data-testid="stTextInput"] input:focus { border-color: #ffffff !important; box-shadow: none !important; }
-    </style>
-    """, unsafe_allow_html=True)
-
-st.markdown(
-    """
-    <h1 style='text-align: center; font-size: 28px; margin-top: -20px; margin-bottom: 0px; line-height: 1.2;'>
-        📟 Laporan Produksi Dept. Press <br> PT Indosafety Sentosa
-    </h1>
-    """,
-    unsafe_allow_html=True,
-)
 
 # ============================================================
-# SIDEBAR
-# ============================================================
-if st.sidebar.button("🔄 Update Data Master"):
-    st.cache_data.clear()          # hanya master data yang di-cache
-    st.sidebar.success("Data master diperbarui!")
-
-
-def sidebar_admin() -> None:
-    """Menu admin: cek koneksi & import CSV Master_Karyawan / MainData ke Supabase."""
-    with st.sidebar.expander("🛠️ Admin: Import Data Master"):
-        try:
-            pin_benar = str(st.secrets.get("admin", {}).get("pin", "")).strip()
-        except Exception:
-            pin_benar = ""
-        if not pin_benar:
-            st.info("Tambahkan [admin] pin = \"....\" di Secrets untuk membuka menu ini.")
-            return
-        if st.text_input("PIN Admin", type="password", key="admin_pin") != pin_benar:
-            return
-
-        if st.button("🔌 Cek Koneksi Database"):
-            try:
-                st.success(f"Terhubung. Karyawan terdaftar: {db.ping()}")
-            except DBError as e:
-                st.error(f"{e}")
-
-        st.caption("Google Sheets → File → Download → CSV, lalu upload di sini. Aman diulang (upsert).")
-        f_kary = st.file_uploader("Master_Karyawan.csv", type="csv", key="up_kary")
-        f_main = st.file_uploader("MainData.csv", type="csv", key="up_main")
-
-        if st.button("⬆️ Import ke Supabase", disabled=not (f_kary or f_main)):
-            import pandas as pd
-            import master_import as mi
-            try:
-                client = db.get_client()
-                if f_kary:
-                    n = mi.import_karyawan(client, pd.read_csv(f_kary, dtype=str))
-                    st.success(f"master_karyawan: {n} baris")
-                if f_main:
-                    n_line, n_part = mi.import_main_data(client, pd.read_csv(f_main, dtype=str))
-                    st.success(f"master_line: {n_line} baris, main_data: {n_part} baris")
-                st.cache_data.clear()
-            except Exception as e:
-                st.error(f"Import gagal: {e}")
-
-
-sidebar_admin()
-
-
-# ============================================================
-# HELPER UI
+# HELPER
 # ============================================================
 def flash(msg: str, icon: str = "✅") -> None:
     """Simpan pesan untuk ditampilkan setelah st.rerun()."""
@@ -222,6 +143,11 @@ def pulihkan_proses(row: dict) -> None:
     st.session_state.sudah_start_diklik = True
 
 
+def fmt_angka(v) -> str:
+    f = float(v or 0)
+    return f"{f:g}" if f == int(f) else f"{f:.2f}"
+
+
 # ============================================================
 # LOGIKA SCAN KANBAN
 # ============================================================
@@ -238,12 +164,12 @@ def handle_scan(raw) -> None:
             aktif = db.get_active_proses(nik)
             if aktif:
                 pulihkan_proses(aktif)
-                flash(f"🔄 Sesi {aktif['part_no']} dipulihkan!")
+                flash(f"Sesi {aktif['part_no']} dipulihkan!", "🔄")
                 st.rerun()
 
             proses_list = db.get_part_processes(part_no)
             if not proses_list:
-                st.error(f"❌ Part No '{part_no}' tidak terdaftar di Main Data!")
+                st.error(f"❌ Part No **{part_no}** tidak terdaftar di Main Data.")
                 return
             st.session_state.available_processes = proses_list
             st.session_state.status_kerja = "SELECTING_PROCESS"
@@ -252,171 +178,284 @@ def handle_scan(raw) -> None:
         elif status == "RUNNING":
             dp = st.session_state.current_part
             if not st.session_state.get("sudah_start_diklik"):
-                st.error("⚠️ Klik '🚀 Konfirmasi Start Proses' dulu sebelum scan FINISH.")
+                st.error("⚠️ Tekan **MULAI PRODUKSI** dulu sebelum scan FINISH.")
                 return
             if part_no == str(dp["part_no"]).strip():
                 st.session_state.status_kerja = "FINISHING"
                 st.session_state.waktu_end = now_wib()
-                flash("🏁 Scan Finish Berhasil!")
+                flash("Scan Finish berhasil!", "🏁")
                 st.rerun()
             else:
-                st.error(f"❌ Barcode ({part_no}) berbeda dengan Part aktif: {dp['part_no']}")
+                st.error(f"❌ KANBAN **{part_no}** berbeda dengan Part aktif **{dp['part_no']}**.")
     except DBError as e:
         tampilkan_error(e, "Gagal membaca data")
 
 
+# ============================================================
+# MENU ADMIN (di bawah layar Scan ID)
+# ============================================================
+def menu_admin() -> None:
+    with st.expander("⚙️ Admin"):
+        if st.button("🔄 Muat Ulang Data Master", width="stretch"):
+            st.cache_data.clear()
+            st.success("Cache data master dikosongkan.")
+
+        try:
+            pin_benar = str(st.secrets.get("admin", {}).get("pin", "")).strip()
+        except Exception:
+            pin_benar = ""
+        if not pin_benar:
+            st.info("Tambahkan [admin] pin = \"....\" di Secrets untuk membuka menu import.")
+            return
+        if st.text_input("PIN Admin", type="password", key="admin_pin") != pin_benar:
+            return
+
+        if st.button("🔌 Cek Koneksi Database", width="stretch"):
+            try:
+                st.success(f"Terhubung. Karyawan terdaftar: {db.ping()}")
+            except DBError as e:
+                st.error(f"{e}")
+
+        st.caption("Google Sheets → File → Download → CSV, lalu upload di sini. Aman diulang (upsert).")
+        f_kary = st.file_uploader("Master_Karyawan.csv", type="csv", key="up_kary")
+        f_main = st.file_uploader("MainData.csv", type="csv", key="up_main")
+
+        if st.button("⬆️ Import ke Supabase", disabled=not (f_kary or f_main), width="stretch"):
+            import pandas as pd
+            import master_import as mi
+            try:
+                client = db.get_client()
+                if f_kary:
+                    n = mi.import_karyawan(client, pd.read_csv(f_kary, dtype=str))
+                    st.success(f"master_karyawan: {n} baris")
+                if f_main:
+                    n_line, n_part = mi.import_main_data(client, pd.read_csv(f_main, dtype=str))
+                    st.success(f"master_line: {n_line} baris, main_data: {n_part} baris")
+                st.cache_data.clear()
+            except Exception as e:
+                st.error(f"Import gagal: {e}")
+
+
+# ============================================================
+# STATE SAAT INI
+# ============================================================
 tampilkan_flash()
 
 nama_karyawan = st.session_state.get("nama_terpilih", "")
 nik_karyawan = st.session_state.get("nik_karyawan", "")
 
-
-# ============================================================
-# LAYAR 1: BELUM SCAN ID OPERATOR
-# ============================================================
 if not nik_karyawan:
-    st.subheader("👋 Selamat Datang! Silakan Scan ID Operator")
-    barcode_id = qrcode_scanner(key="scanner_id_operator")
-
-    if barcode_id:
-        teks = decode_scan(barcode_id)
-        if ";" not in teks:
-            st.error("🚫 Format QR ID tidak valid. Harus berformat NIK;NAMA.")
-        else:
-            raw_nik, raw_nama = [x.strip() for x in teks.split(";")[:2]]
-            nik = normalize_nik(raw_nik)
-            try:
-                kary = db.get_karyawan(nik)
-                if not kary or not kary.get("aktif", True):
-                    st.error(f"🚫 Akses Ditolak! NIK {raw_nik} tidak terdaftar.")
-                else:
-                    reset_keys(KEYS_OPERATOR)
-                    st.session_state.nik_karyawan = nik
-                    st.session_state.nama_terpilih = kary.get("nama") or raw_nama
-
-                    with st.spinner("Mengecek status kerja terakhir..."):
-                        st.session_state.shift = db.get_active_shift(nik)
-                        aktif = db.get_active_proses(nik)
-
-                    if aktif:
-                        pulihkan_proses(aktif)
-                        flash(f"🔄 Melanjutkan proses: {aktif.get('part_name')}")
-                    else:
-                        st.session_state.status_kerja = "IDLE"
-                        flash(f"Terverifikasi: {st.session_state.nama_terpilih}")
-                    st.rerun()
-            except DBError as e:
-                tampilkan_error(e, "Gagal verifikasi ID")
-
-
-# ============================================================
-# LAYAR 2: SUDAH SCAN ID TAPI BELUM CHECK-IN
-# ============================================================
+    tahap = "LOGIN"
 elif not st.session_state.get("shift"):
-    st.warning(f"⚠️ Halo **{nama_karyawan}** | {nik_karyawan} — Anda belum Check-In.")
-
-    if st.button("🟢 KLIK UNTUK CHECK-IN SEKARANG", width="stretch"):
-        try:
-            with st.spinner("Menyimpan Check-In..."):
-                st.session_state.shift = db.check_in(nik_karyawan, nama_karyawan)
-            st.session_state.status_kerja = "IDLE"
-            jam = parse_ts(st.session_state.shift["check_in"]).strftime("%H:%M:%S")
-            flash(f"Berhasil Check-In pukul {jam}! Scanner Part siap digunakan.")
-            st.rerun()
-        except DBError as e:
-            tampilkan_error(e, "Gagal Check-In")
-
-    st.divider()
-    if st.button("⬅️ Kembali / Scan Ulang ID Operator", type="secondary", width="stretch"):
-        reset_keys(KEYS_OPERATOR)
-        st.rerun()
-
-
-# ============================================================
-# LAYAR 3 & 4: SUDAH CHECK-IN — AREA PRODUKSI
-# ============================================================
+    tahap = "CHECKIN"
 else:
-    st.success(f"👷 Operator: **{nama_karyawan}** | **{nik_karyawan}** | Sesi Aktif")
-    status_kerja = st.session_state.get("status_kerja", "IDLE")
+    tahap = st.session_state.get("status_kerja", "IDLE")
 
-    # ----------------------------------------------------------
-    # IDLE — scan kanban / input manual / check-out
-    # ----------------------------------------------------------
-    if status_kerja == "IDLE":
-        st.write("<span style='font-size: 18px; font-weight: bold;'>📸 Opsi 1: Scan KANBAN untuk mulai proses</span>",
-                 unsafe_allow_html=True)
-        barcode_part = qrcode_scanner(key="scanner_part_prod")
-        if barcode_part:
-            handle_scan(barcode_part)
+ui.topbar(tahap, nama_karyawan, nik_karyawan)
 
-        st.divider()
-        st.write("<span style='font-size: 18px; font-weight: bold;'>⌨️ Opsi 2: Input Part No. Manual</span>",
-                 unsafe_allow_html=True)
-        manual_input = st.text_input("Ketik Part No.", key="manual_part_input").strip().upper()
-        if st.button("✅ Konfirmasi Input Manual", width="stretch") and manual_input:
-            handle_scan(manual_input)
 
-        st.divider()
-        st.write("Jika sudah selesai semua pekerjaan shift ini:")
+# ============================================================
+# LAYAR 1: SCAN ID OPERATOR
+# ============================================================
+if tahap == "LOGIN":
+    _, tengah, _ = st.columns([1, 2, 1])
+    with tengah:
+        with st.container(key="card_login"):
+            ui.judul("Langkah 1 · Identitas Operator", "Arahkan kamera ke QR Code ID card Anda.")
+            barcode_id = qrcode_scanner(key="scanner_id_operator")
 
-        with st.popover("🔴 SELESAI SHIFT (CHECK-OUT)", width="stretch"):
-            st.write("### Konfirmasi Check-Out")
-            st.warning("Apakah Anda yakin ingin mengakhiri shift sekarang?")
-
-            if st.button("YA, SAYA YAKIN CHECK-OUT", type="primary", width="stretch"):
+        if barcode_id:
+            teks = decode_scan(barcode_id)
+            if ";" not in teks:
+                st.error("🚫 Format QR ID tidak valid. Harus berformat NIK;NAMA.")
+            else:
+                raw_nik, raw_nama = [x.strip() for x in teks.split(";")[:2]]
+                nik = normalize_nik(raw_nik)
                 try:
-                    with st.spinner("Memproses Check-Out..."):
-                        aktif = db.get_active_proses(nik_karyawan)
+                    kary = db.get_karyawan(nik)
+                    if not kary or not kary.get("aktif", True):
+                        st.error(f"🚫 Akses ditolak! NIK **{raw_nik}** tidak terdaftar.")
+                    else:
+                        reset_keys(KEYS_OPERATOR)
+                        st.session_state.nik_karyawan = nik
+                        st.session_state.nama_terpilih = kary.get("nama") or raw_nama
+
+                        with st.spinner("Mengecek status kerja terakhir..."):
+                            st.session_state.shift = db.get_active_shift(nik)
+                            aktif = db.get_active_proses(nik)
+
                         if aktif:
-                            st.error(f"❌ Tidak bisa Check-Out! Masih ada pekerjaan aktif: "
-                                     f"**{aktif['part_no']}**. Selesaikan dulu.")
+                            pulihkan_proses(aktif)
+                            flash(f"Melanjutkan proses: {aktif.get('part_name')}", "🔄")
                         else:
-                            total_jam = db.check_out(st.session_state.shift)
-                            reset_keys(KEYS_OPERATOR)
-                            flash(f"Check-Out Berhasil! Total jam kerja: {total_jam} jam")
-                            st.rerun()
+                            st.session_state.status_kerja = "IDLE"
+                            flash(f"Terverifikasi: {st.session_state.nama_terpilih}")
+                        st.rerun()
                 except DBError as e:
-                    tampilkan_error(e, "Gagal Check-Out")
+                    tampilkan_error(e, "Gagal verifikasi ID")
 
-            st.divider()
-            if st.button("⬅️ Ganti Operator / Salah Scan Nama", width="stretch"):
-                reset_keys(KEYS_OPERATOR)
-                st.rerun()
+        st.write("")
+        menu_admin()
 
-    # ----------------------------------------------------------
-    # SELECTING_PROCESS — pilih urutan proses, line & condition
-    # ----------------------------------------------------------
-    elif status_kerja == "SELECTING_PROCESS":
-        st.subheader("🔍 Pilih Detail Produksi")
-        data_pilihan = list(st.session_state.get("available_processes", []))
 
-        if not any(p.get("urutan") == "DPMR" for p in data_pilihan):
-            sample = data_pilihan[0] if data_pilihan else {}
-            data_pilihan.append({
-                "urutan":    "DPMR",
-                "part_name": sample.get("part_name", "REPAIR"),
-                "part_no":   sample.get("part_no", "REPAIR"),
-                "model":     sample.get("model", "REPAIR"),
-                "line":      sample.get("line", "-"),
-                "sec_pcs":   0,
-            })
+# ============================================================
+# LAYAR 2: CHECK-IN
+# ============================================================
+elif tahap == "CHECKIN":
+    _, tengah, _ = st.columns([1, 2, 1])
+    with tengah:
+        with st.container(key="card_checkin"):
+            ui.judul("Langkah 2 · Mulai Shift")
+            st.markdown(
+                f'<div class="hint">Selamat datang,</div>'
+                f'<div class="bigname">{ui.esc(nama_karyawan)}</div>'
+                f'<div class="hint mono">NIK {ui.esc(nik_karyawan)} · Belum Check-In</div>',
+                unsafe_allow_html=True,
+            )
+            if st.button("CHECK-IN SEKARANG", key="go_checkin", width="stretch"):
+                try:
+                    with st.spinner("Menyimpan Check-In..."):
+                        st.session_state.shift = db.check_in(nik_karyawan, nama_karyawan)
+                    st.session_state.status_kerja = "IDLE"
+                    jam = parse_ts(st.session_state.shift["check_in"]).strftime("%H:%M:%S")
+                    flash(f"Check-In berhasil pukul {jam}. Scanner Part siap.")
+                    st.rerun()
+                except DBError as e:
+                    tampilkan_error(e, "Gagal Check-In")
 
-        try:
-            list_line = db.get_lines() or FALLBACK_LINE
-        except DBError:
-            list_line = FALLBACK_LINE
+        if st.button("⬅️ Bukan saya · Scan ulang ID", width="stretch"):
+            reset_keys(KEYS_OPERATOR)
+            st.rerun()
 
-        selected_condition = st.radio(
-            "📌 Pilih Kondisi Kerja (Condition):",
-            options=["Normal", "Overtime"],
-            horizontal=True,
-            key="radio_condition",
+
+# ============================================================
+# LAYAR 3: IDLE — scan kanban / input manual / check-out
+# ============================================================
+elif tahap == "IDLE":
+    shift = st.session_state.shift
+    jam_masuk = parse_ts(shift["check_in"])
+    lama_shift = now_wib() - jam_masuk
+    ui.kpi_grid([
+        ("Check-In", jam_masuk.strftime("%H:%M"), "", jam_masuk.strftime("%d %b %Y")),
+        ("Lama Shift", f"{int(lama_shift.total_seconds() // 3600)}j {int(lama_shift.total_seconds() % 3600 // 60)}m", ""),
+        ("Status", "SIAP", "ok", "Scan KANBAN untuk mulai"),
+    ])
+
+    kiri, kanan = st.columns([3, 2], gap="medium")
+    with kiri:
+        with st.container(key="card_scan_start"):
+            ui.judul("Scan KANBAN", "Scan QR KANBAN part yang akan diproses.")
+            barcode_part = qrcode_scanner(key="scanner_part_prod")
+            if barcode_part:
+                handle_scan(barcode_part)
+
+    with kanan:
+        with st.container(key="card_manual_start"):
+            ui.judul("Input Manual", "Jika QR KANBAN rusak / tidak terbaca.")
+            manual_input = st.text_input("Part No.", key="manual_part_input",
+                                         placeholder="cth. 23-4579831-2").strip().upper()
+            if st.button("LANJUT ➜", key="btn_manual_start", type="primary", width="stretch") and manual_input:
+                handle_scan(manual_input)
+
+        st.write("")
+        with st.container(key="stop_checkout"):
+            with st.popover("⏻  SELESAI SHIFT (CHECK-OUT)", width="stretch"):
+                st.markdown("### Akhiri shift sekarang?")
+                st.caption("Pastikan semua proses sudah FINISH dan SPH terkirim.")
+                if st.button("YA, CHECK-OUT", key="stop_confirm_checkout", width="stretch"):
+                    try:
+                        with st.spinner("Memproses Check-Out..."):
+                            aktif = db.get_active_proses(nik_karyawan)
+                            if aktif:
+                                st.error(f"❌ Masih ada proses aktif: **{aktif['part_no']}**. Selesaikan dulu.")
+                            else:
+                                total_jam = db.check_out(st.session_state.shift)
+                                reset_keys(KEYS_OPERATOR)
+                                flash(f"Check-Out berhasil. Total jam kerja: {total_jam} jam", "👋")
+                                st.rerun()
+                    except DBError as e:
+                        tampilkan_error(e, "Gagal Check-Out")
+                if st.button("Ganti Operator", width="stretch"):
+                    reset_keys(KEYS_OPERATOR)
+                    st.rerun()
+
+
+# ============================================================
+# LAYAR 4: SELECTING_PROCESS — kondisi, line & urutan proses
+# ============================================================
+elif tahap == "SELECTING_PROCESS":
+    data_pilihan = list(st.session_state.get("available_processes", []))
+
+    if not any(p.get("urutan") == "DPMR" for p in data_pilihan):
+        sample = data_pilihan[0] if data_pilihan else {}
+        data_pilihan.append({
+            "urutan":    "DPMR",
+            "part_name": sample.get("part_name", "REPAIR"),
+            "part_no":   sample.get("part_no", "REPAIR"),
+            "model":     sample.get("model", "REPAIR"),
+            "line":      sample.get("line", "-"),
+            "sec_pcs":   0,
+        })
+
+    try:
+        list_line = db.get_lines() or FALLBACK_LINE
+    except DBError:
+        list_line = FALLBACK_LINE
+
+    contoh = data_pilihan[0]
+    with st.container(key="card_part_info"):
+        st.markdown(
+            f'<div class="sec">Part terdeteksi</div>'
+            f'<div class="bigname">{ui.esc(contoh.get("part_name"))}</div>'
+            f'<div class="hint mono">{ui.esc(contoh.get("part_no"))} · {ui.esc(contoh.get("model"))}</div>',
+            unsafe_allow_html=True,
         )
-        actual_line = st.selectbox("Pilih Line Produksi (Actual Line)", options=list_line)
-        opsi_display = {f"{p['urutan']} | {p['part_name']}": p for p in data_pilihan}
-        pilihan_user = st.selectbox("Pilih Urutan Proses Produksi", options=list(opsi_display.keys()))
 
-        if st.button("Konfirmasi & Mulai Kerja", width="stretch"):
+    st.write("")
+    opsi_display = {f"{p['urutan']}": p for p in data_pilihan}
+
+    kiri, kanan = st.columns(2, gap="medium")
+    with kiri:
+        with st.container(key="card_pilih_proses"):
+            ui.judul("1 · Urutan Proses")
+            if len(opsi_display) <= 12:
+                pilihan_user = st.pills("Urutan proses", options=list(opsi_display.keys()),
+                                        default=list(opsi_display.keys())[0], key="pill_urutan",
+                                        label_visibility="collapsed")
+            else:
+                pilihan_user = st.selectbox("Urutan proses", options=list(opsi_display.keys()),
+                                            key="sel_urutan", label_visibility="collapsed")
+
+            ui.judul("2 · Kondisi Kerja")
+            selected_condition = st.segmented_control(
+                "Kondisi", options=["Normal", "Overtime"], default="Normal",
+                key="seg_condition", label_visibility="collapsed",
+            ) or "Normal"
+
+    with kanan:
+        with st.container(key="card_pilih_line"):
+            ui.judul("3 · Mesin / Actual Line")
+            detail_awal = opsi_display.get(pilihan_user or "", contoh)
+            line_default = detail_awal.get("line")
+            idx_line = list_line.index(line_default) if line_default in list_line else 0
+            actual_line = st.selectbox("Actual line", options=list_line, index=idx_line,
+                                       key="sel_actual_line", label_visibility="collapsed")
+
+            if pilihan_user:
+                d = opsi_display[pilihan_user]
+                ui.kpi_grid([
+                    ("Target Sec/Pcs", fmt_angka(d.get("sec_pcs")), "accent"),
+                    ("Line Standar", d.get("line") or "-", ""),
+                ])
+
+    st.write("")
+    b1, b2 = st.columns([1, 3], gap="medium")
+    with b1:
+        if st.button("✕ Batal", width="stretch"):
+            reset_keys(KEYS_PROSES)
+            st.rerun()
+    with b2:
+        if st.button("KONFIRMASI PROSES ➜", key="go_pilih_proses", width="stretch", disabled=not pilihan_user):
             d = opsi_display[pilihan_user]
             st.session_state.current_part = {
                 "proses_id":     None,                 # diisi setelah START tersimpan
@@ -434,99 +473,116 @@ else:
             st.session_state.waktu_start = now_wib()
             st.rerun()
 
-    # ----------------------------------------------------------
-    # RUNNING — proses produksi berjalan
-    # ----------------------------------------------------------
-    elif status_kerja == "RUNNING":
-        dp = st.session_state.get("current_part")
-        if not dp:
-            st.session_state.status_kerja = "IDLE"
-            st.rerun()
 
-        st.info(f"⚡ **Proses Berjalan:** {dp['part_name']} | {dp['part_no']} ({dp['condition']})")
-        st.write("### Konfirmasi Mulai Kerja")
+# ============================================================
+# LAYAR 5: RUNNING — proses produksi berjalan
+# ============================================================
+elif tahap == "RUNNING":
+    dp = st.session_state.get("current_part")
+    if not dp:
+        st.session_state.status_kerja = "IDLE"
+        st.rerun()
 
-        if not st.session_state.get("sudah_start_diklik"):
-            st.warning("⚠️ Tentukan Waktu Start Manual lalu klik tombol di bawah untuk mulai menghitung produksi.")
-            jam_manual = st.time_input(
-                "🕒 Pilih Waktu Start Produksi (Manual):",
-                # default dikunci sekali agar input operator tidak ter-reset saat menit berganti
-                value=st.session_state.setdefault(
-                    "default_jam_start", now_wib().time().replace(second=0, microsecond=0)),
-                step=60,
-                key="input_actual_time_start",
-            )
+    sudah_start = bool(st.session_state.get("sudah_start_diklik"))
+    ui.panel_produksi(dp, st.session_state.waktu_start, sudah_start)
 
-            if st.button("🚀 Konfirmasi Start Proses", width="stretch"):
-                now = now_wib()
-                start_dt = combine_wib(now.date(), jam_manual)
-                # Shift malam: jam start 23:50 diinput pukul 00:10 → milik kemarin
-                if start_dt > now + timedelta(minutes=5):
-                    start_dt -= timedelta(days=1)
+    ui.kpi_grid([
+        ("Target Sec/Pcs", fmt_angka(dp["sec_pcs"]), "accent"),
+        ("Target / Jam", f"{int(3600 / dp['sec_pcs'])} pcs" if dp["sec_pcs"] else "—", ""),
+        ("Line Standar", dp["line"] or "-", ""),
+        ("Status Data", "TERSIMPAN" if sudah_start else "BELUM START", "ok" if sudah_start else "bad"),
+    ])
 
-                data_start = {
-                    "tanggal":           start_dt.date(),
-                    "waktu_kerja_id":    st.session_state.shift["id"],
-                    "nik":               nik_karyawan,
-                    "nama":              nama_karyawan,
-                    "part_no":           dp["part_no"],
-                    "part_name":         dp["part_name"],
-                    "model":             dp["model"],
-                    "line":              dp["line"],
-                    "urutan_proses":     dp["urutan_proses"],
-                    "actual_line":       dp["Actual_Line"] or None,
-                    "condition":         dp["condition"],
-                    "sec_pcs":           dp["sec_pcs"],
-                    "actual_time_start": start_dt,
-                    "status":            "START",
-                }
-                try:
-                    row = db.start_proses(data_start)
-                    dp["proses_id"] = row["id"]
-                    st.session_state.waktu_start = start_dt
-                    st.session_state.sudah_start_diklik = True
-                    flash(f"Produksi dimulai pukul {start_dt:%H:%M:%S} ({dp['condition']})!", "🚀")
-                    st.rerun()
-                except DuplicateError:
-                    st.error("⚠️ Masih ada proses START aktif di database. "
-                             "Klik Reset Scanner lalu scan KANBAN lagi — sesi lama akan dipulihkan.")
-                except DBError as e:
-                    tampilkan_error(e, "Gagal menyimpan START")
-        else:
-            st.success(f"✅ Proses Sudah Dimulai — Kondisi: **{dp['condition']}**")
-            st.info("⚠️ Input ABNORMAL di bawah dan scan KANBAN FINISH untuk akhiri proses.")
-            st.info("DATA START ANDA SUDAH TERSIMPAN DI DATABASE. SELAMAT BEKERJA! 🙌")
+    # ---------------- Konfirmasi START ----------------
+    if not sudah_start:
+        with st.container(key="card_start"):
+            ui.judul("Konfirmasi Mulai Produksi", "Sesuaikan jam mulai bila perlu, lalu tekan MULAI PRODUKSI.")
+            c_jam, c_btn = st.columns([1, 2], gap="medium", vertical_alignment="bottom")
+            with c_jam:
+                jam_manual = st.time_input(
+                    "Jam Start",
+                    # default dikunci sekali agar input operator tidak ter-reset saat menit berganti
+                    value=st.session_state.setdefault(
+                        "default_jam_start", now_wib().time().replace(second=0, microsecond=0)),
+                    step=60,
+                    key="input_actual_time_start",
+                )
+            with c_btn:
+                klik_start = st.button("▶  MULAI PRODUKSI", key="go_start", width="stretch")
 
-        durasi = now_wib() - st.session_state.waktu_start
-        total_menit = max(0, int(durasi.total_seconds() // 60))
+        if klik_start:
+            now = now_wib()
+            start_dt = combine_wib(now.date(), jam_manual)
+            # Shift malam: jam start 23:50 diinput pukul 00:10 → milik kemarin
+            if start_dt > now + timedelta(minutes=5):
+                start_dt -= timedelta(days=1)
 
-        col1, col2, col3, col4, col5, col6 = st.columns(6, gap="small")
-        col1.metric("Urutan",         dp["urutan_proses"])
-        col2.metric("Target Sec/Pcs", dp["sec_pcs"])
-        col3.metric("Mulai (Start)",  st.session_state.waktu_start.strftime("%H:%M:%S"))
-        col4.metric("Sudah Berjalan", f"{total_menit} Menit", delta=f"{total_menit / 60:.2f} Jam", delta_color="off")
-        col5.metric("Actual Line",    dp["Actual_Line"])
-        col6.metric("Kondisi",        dp["condition"])
+            data_start = {
+                "tanggal":           start_dt.date(),
+                "waktu_kerja_id":    st.session_state.shift["id"],
+                "nik":               nik_karyawan,
+                "nama":              nama_karyawan,
+                "part_no":           dp["part_no"],
+                "part_name":         dp["part_name"],
+                "model":             dp["model"],
+                "line":              dp["line"],
+                "urutan_proses":     dp["urutan_proses"],
+                "actual_line":       dp["Actual_Line"] or None,
+                "condition":         dp["condition"],
+                "sec_pcs":           dp["sec_pcs"],
+                "actual_time_start": start_dt,
+                "status":            "START",
+            }
+            try:
+                row = db.start_proses(data_start)
+                dp["proses_id"] = row["id"]
+                st.session_state.waktu_start = start_dt
+                st.session_state.sudah_start_diklik = True
+                flash(f"Produksi dimulai pukul {start_dt:%H:%M} ({dp['condition']})", "🚀")
+                st.rerun()
+            except DuplicateError:
+                st.error("⚠️ Masih ada proses START aktif di database. "
+                         "Tekan Reset lalu scan KANBAN lagi — sesi lama akan dipulihkan.")
+            except DBError as e:
+                tampilkan_error(e, "Gagal menyimpan START")
 
-        st.divider()
+    # ---------------- Finish & Abnormal (tab) ----------------
+    tab_finish, tab_abnormal = st.tabs(["🏁  FINISH", "⚠️  ABNORMAL"])
 
-        # ---------------- Input Abnormal ----------------
-        with st.expander("⚠️ INPUT ABNORMAL", expanded=False):
-            st.write("Input langsung tersimpan ke database. Jika DPMR, tulis OK dan NG total di Keterangan.")
+    with tab_finish:
+        kiri, kanan = st.columns([3, 2], gap="medium")
+        with kiri:
+            with st.container(key="card_scan_finish"):
+                ui.judul("Scan KANBAN Finish", "Scan KANBAN yang sama untuk mengakhiri proses.")
+                barcode_data = qrcode_scanner(key="scanner_finish_part")
+                if barcode_data:
+                    handle_scan(barcode_data)
+        with kanan:
+            with st.container(key="card_manual_finish"):
+                ui.judul("Input Manual Finish")
+                manual_finish = st.text_input("Part No.", key="manual_part_finish_input",
+                                              placeholder=dp["part_no"]).strip().upper()
+                if st.button("FINISH ➜", key="btn_manual_finish", type="primary", width="stretch") and manual_finish:
+                    handle_scan(manual_finish)
+
+    with tab_abnormal:
+        with st.container(key="card_abnormal"):
+            ui.judul("Catat Kendala", "Langsung tersimpan. Untuk DPMR, tulis jumlah OK & NG di Keterangan.")
             try:
                 list_kode = [f"{r['kode']} [{r['uraian']}]" for r in db.get_kode_abnormal()] or FALLBACK_KODE_ABNORMAL
             except DBError:
                 list_kode = FALLBACK_KODE_ABNORMAL
 
             counter = st.session_state.setdefault("ab_counter", 0)
-            c_kod, c_men, c_ket = st.columns([1, 1, 2])
-            k_sel    = c_kod.selectbox("Kode", options=list_kode, key=f"ab_kode_run_{counter}")
-            m_val    = c_men.number_input("Menit", min_value=0, step=1, key=f"ab_menit_run_{counter}")
-            kt_val   = c_ket.text_input("Keterangan", placeholder="Contoh: Mesin Down", key=f"ab_ket_run_{counter}").upper()
+            c_kod, c_men = st.columns([3, 1], gap="small")
+            k_sel  = c_kod.selectbox("Kode Abnormal", options=list_kode, key=f"ab_kode_run_{counter}")
+            m_val  = c_men.number_input("Menit", min_value=0, step=1, key=f"ab_menit_run_{counter}")
+            kt_val = st.text_input("Keterangan", placeholder="cth. MESIN DOWN, TUNGGU MAINTENANCE",
+                                   key=f"ab_ket_run_{counter}").upper()
 
-            if st.button("🚀 Kirim Data Abnormal", width="stretch", key=f"btn_ab_submit_{counter}"):
+            if st.button("KIRIM ABNORMAL", key=f"go_abnormal_{counter}", width="stretch"):
                 if not st.session_state.get("sudah_start_diklik"):
-                    st.error("⚠️ Klik tombol START PROSES sebelum kirim data abnormal!")
+                    st.error("⚠️ Tekan MULAI PRODUKSI sebelum kirim data abnormal.")
                 elif k_sel and m_val > 0:
                     kode, _, uraian = k_sel.partition(" [")
                     now = now_wib()
@@ -552,160 +608,177 @@ else:
                         db.insert_abnormal(row_ab)
                         st.session_state.pop(f"ab_ref_{counter}", None)
                         st.session_state.ab_counter = counter + 1     # kosongkan form
-                        flash(f"Kode {k_sel} tersimpan!")
+                        flash(f"Abnormal {kode.strip()} · {int(m_val)} menit tersimpan", "⚠️")
                         st.rerun()
                     except DBError as e:
                         tampilkan_error(e, "Gagal menyimpan ABNORMAL")
                 else:
-                    st.error("Pilih Kode & isi Menit terlebih dahulu!")
+                    st.error("Pilih Kode & isi Menit (lebih dari 0).")
 
-        st.divider()
-        st.write("<span style='font-size: 18px; font-weight: bold;'>📸 SCAN KANBAN untuk FINISH</span>",
-                 unsafe_allow_html=True)
-        barcode_data = qrcode_scanner(key="scanner_finish_part")
-        if barcode_data:
-            handle_scan(barcode_data)
-
-        st.divider()
-        st.write("<span style='font-size: 18px; font-weight: bold;'>⌨️ Input KANBAN Manual</span>",
-                 unsafe_allow_html=True)
-        manual_finish = st.text_input("Ketik Part No", key="manual_part_finish_input").strip().upper()
-        if st.button("✅ Konfirmasi Input Manual Finish", width="stretch") and manual_finish:
-            handle_scan(manual_finish)
-
-    # ----------------------------------------------------------
-    # FINISHING — ACT, NG, waktu finish manual, istirahat, kirim SPH
-    # ----------------------------------------------------------
-    elif status_kerja == "FINISHING":
-        dp = st.session_state.get("current_part")
-        if not dp:
-            st.session_state.status_kerja = "IDLE"
-            st.rerun()
-
-        st.subheader(f"📝 Laporan Akhir: {dp['part_name']} ({dp['condition']})")
-        sudah_terkirim = st.session_state.get("data_sph_terkirim", False)
-
-        # 1. ACT & NG
-        c1, c2 = st.columns(2)
-        act_raw = c1.text_input("Jumlah ACT", value="0", disabled=sudah_terkirim)
-        ng_raw  = c2.text_input("Jumlah NG",  value="0", disabled=sudah_terkirim)
-        try:
-            act, ng = int(act_raw), int(ng_raw)
-            input_valid = act >= 0 and ng >= 0
-        except ValueError:
-            act, ng, input_valid = 0, 0, False
-        if not input_valid:
-            st.error("⚠️ ACT dan NG harus angka bulat ≥ 0.")
-
-        # 2. Waktu finish manual
-        st.write("### 🕒 Input Waktu Selesai Produksi (Manual)")
-        default_finish = st.session_state.get("waktu_end") or now_wib()
-        waktu_finish_manual = st.time_input(
-            "Pilih Waktu Finish Produksi:",
-            value=default_finish.time().replace(second=0, microsecond=0),
-            step=60,
-            key="input_actual_time_finish",
-            disabled=sudah_terkirim,
-        )
-
-        dt_start = st.session_state.waktu_start
-        dt_finish = combine_wib(dt_start.date(), waktu_finish_manual)
-        if dt_finish < dt_start:             # lewat tengah malam
-            dt_finish += timedelta(days=1)
-        durasi_kotor_menit = (dt_finish - dt_start).total_seconds() / 60
-
-        # 3. Potongan istirahat
-        st.write("### ☕ Potongan Waktu Istirahat")
-        pilihan_break = st.multiselect("Pilih Break:", options=list(DAFTAR_BREAK.keys()), disabled=sudah_terkirim)
-        extra_custom  = st.number_input("Lainnya (Menit)", min_value=0, step=1, value=0, disabled=sudah_terkirim)
-        total_potongan = sum(DAFTAR_BREAK[b] for b in pilihan_break) + int(extra_custom)
-
-        # 4. Perhitungan (rumus sama dengan versi lama)
-        durasi_bersih_menit = max(0.0, durasi_kotor_menit - total_potongan)
-        total_jam_actual = durasi_bersih_menit / 60
-        total_waktu_actual_str = f"{int(durasi_bersih_menit // 60)} Jam {int(durasi_bersih_menit % 60)} Menit"
-
-        is_repair     = dp["urutan_proses"] == "DPMR"
-        val_sec_pcs   = float(dp.get("sec_pcs") or 0)
-        standar_input = (val_sec_pcs * act) / 60 if (act > 0 and not is_repair) else 0
-        persen_prod   = round((standar_input / durasi_bersih_menit) * 100, 2) if (durasi_bersih_menit > 0 and not is_repair) else 0.0
-        rasio_ng      = round(ng / act * 100, 2) if (act > 0 and not is_repair) else 0.0
-
-        st.info(f"⏱️ **Waktu Start:** {dt_start:%Y-%m-%d %H:%M:%S}  →  **Finish:** {dt_finish:%Y-%m-%d %H:%M:%S}  "
-                f"|  Durasi bersih: {total_waktu_actual_str}")
-        st.divider()
-
-        # 5. Kirim SPH
-        if not sudah_terkirim and st.button("🚀 Kirim Data SPH", width="stretch"):
-            if not input_valid or act <= 0:
-                st.error("⚠️ Jumlah ACT harus diisi dan lebih dari 0!")
-            else:
-                data_finish = {
-                    "actual_time_finish": dt_finish,
-                    "act":                act,
-                    "ng":                 ng,
-                    "persen_prod":        None if is_repair else persen_prod,   # NULL = N/A
-                    "total_istirahat":    total_potongan,
-                    "rasio_ng":           None if is_repair else rasio_ng,
-                    "total_jam":          round(total_jam_actual, 2),
-                }
-                try:
-                    proses_id = dp.get("proses_id")
-                    if not proses_id:                       # jaga-jaga sesi lama
-                        aktif = db.get_active_proses(nik_karyawan)
-                        proses_id = aktif["id"] if aktif and aktif["part_no"] == dp["part_no"] else None
-                    if not proses_id:
-                        st.error("❌ Tidak ditemukan data START aktif untuk Part ini. Lakukan Scan Start dulu!")
-                    else:
-                        with st.spinner("Menyimpan SPH..."):
-                            db.finish_proses(proses_id, data_finish)
-                        st.session_state.data_sph_terkirim = True
-                        st.session_state.actual_summary_data = {
-                            "total_waktu_actual": total_waktu_actual_str,
-                            "persen_prod":        persen_prod,
-                            "total_jam":          round(total_jam_actual, 2),
-                            "rasio_ng":           rasio_ng,
-                            "is_repair":          is_repair,
-                        }
-                        flash("SPH Terkirim!")
-                        st.rerun()
-                except DBError as e:
-                    tampilkan_error(e, "Gagal menyimpan SPH")
-
-        # 6. Ringkasan
-        if sudah_terkirim:
-            st.subheader("📊 Ringkasan Hasil Produksi")
-            s = st.session_state.get("actual_summary_data", {})
-            r1, r2, r3, r4 = st.columns(4, gap="medium")
-            r1.metric("Total Waktu Actual", s.get("total_waktu_actual", "-"))
-            r2.metric("Persentase Produksi", "N/A" if s.get("is_repair") else f"{s.get('persen_prod', 0):.2f} %")
-            r3.metric("Total Jam Kerja", f"{s.get('total_jam', 0)} Jam")
-            r4.metric("Rasio NG", "N/A" if s.get("is_repair") else f"{s.get('rasio_ng', 0):.2f} %")
-
-            st.info("✅ Data SPH sudah tercatat di database.")
-            st.divider()
-
-            if st.button("🏁 SELESAI & SCAN PART BARU", type="primary", width="stretch"):
-                reset_keys(KEYS_PROSES)
-                st.session_state.status_kerja = "IDLE"
-                flash("Laporan Proses selesai! Siap untuk scan part baru.", "🎉")
-                st.rerun()
-
-    # ----------------------------------------------------------
-    # Tombol bawah
-    # ----------------------------------------------------------
+    # ---------------- Tombol bawah ----------------
     st.divider()
-    if st.session_state.get("status_kerja") == "RUNNING":
-        col_ref, col_res = st.columns(2)
-        with col_ref:
-            if st.button("🔄 Perbarui Waktu"):
-                st.rerun()
-        with col_res:
-            if st.button("🚫 Reset Scanner", type="secondary"):
-                # Data START di database TIDAK dihapus; scan KANBAN berikutnya akan memulihkannya.
-                reset_keys(KEYS_PROSES)
-                st.rerun()
-    elif not st.session_state.get("data_sph_terkirim"):
-        if st.button("❌ Reset Scanner", type="secondary"):
+    c_ref, c_res = st.columns(2)
+    with c_ref:
+        if st.button("↻ Perbarui", width="stretch"):
+            st.rerun()
+    with c_res:
+        if st.button("Reset Scanner", width="stretch"):
+            # Data START di database TIDAK dihapus; scan KANBAN berikutnya akan memulihkannya.
             reset_keys(KEYS_PROSES)
             st.rerun()
+
+
+# ============================================================
+# LAYAR 6: FINISHING — ACT, NG, jam finish, istirahat, kirim SPH
+# ============================================================
+elif tahap == "FINISHING":
+    dp = st.session_state.get("current_part")
+    if not dp:
+        st.session_state.status_kerja = "IDLE"
+        st.rerun()
+
+    sudah_terkirim = st.session_state.get("data_sph_terkirim", False)
+    dt_start = st.session_state.waktu_start
+    is_repair = dp["urutan_proses"] == "DPMR"
+
+    with st.container(key="card_finish_head"):
+        st.markdown(
+            f'<div class="sec">Laporan akhir · Urutan {ui.esc(dp["urutan_proses"])} · {ui.esc(dp["condition"]).upper()}</div>'
+            f'<div class="bigname">{ui.esc(dp["part_name"])}</div>'
+            f'<div class="hint mono">{ui.esc(dp["part_no"])} · Line {ui.esc(dp["Actual_Line"] or "-")} · '
+            f'Start {dt_start:%H:%M}</div>',
+            unsafe_allow_html=True,
+        )
+
+    st.write("")
+    kiri, kanan = st.columns([3, 2], gap="medium")
+
+    with kiri:
+        with st.container(key="card_hasil"):
+            ui.judul("1 · Hasil Produksi")
+            c1, c2 = st.columns(2)
+            act = int(c1.number_input("ACT (pcs OK)", min_value=0, step=1, value=0, disabled=sudah_terkirim))
+            ng = int(c2.number_input("NG (pcs)", min_value=0, step=1, value=0, disabled=sudah_terkirim))
+
+            ui.judul("2 · Jam Selesai")
+            default_finish = st.session_state.get("waktu_end") or now_wib()
+            waktu_finish_manual = st.time_input(
+                "Jam Finish",
+                value=default_finish.time().replace(second=0, microsecond=0),
+                step=60,
+                key="input_actual_time_finish",
+                disabled=sudah_terkirim,
+                label_visibility="collapsed",
+            )
+
+            ui.judul("3 · Potongan Istirahat")
+            pilihan_break = st.pills("Break", options=list(DAFTAR_BREAK.keys()), selection_mode="multi",
+                                     key="pills_break", disabled=sudah_terkirim,
+                                     label_visibility="collapsed") or []
+            extra_custom = st.number_input("Potongan lain (menit)", min_value=0, step=1, value=0,
+                                           disabled=sudah_terkirim)
+
+    # ---------- Perhitungan (rumus sama dengan versi lama) ----------
+    dt_finish = combine_wib(dt_start.date(), waktu_finish_manual)
+    if dt_finish < dt_start:             # lewat tengah malam
+        dt_finish += timedelta(days=1)
+    durasi_kotor_menit = (dt_finish - dt_start).total_seconds() / 60
+    total_potongan = sum(DAFTAR_BREAK[b] for b in pilihan_break) + int(extra_custom)
+
+    durasi_bersih_menit = max(0.0, durasi_kotor_menit - total_potongan)
+    total_jam_actual = durasi_bersih_menit / 60
+    total_waktu_actual_str = f"{int(durasi_bersih_menit // 60)} Jam {int(durasi_bersih_menit % 60)} Menit"
+
+    val_sec_pcs   = float(dp.get("sec_pcs") or 0)
+    standar_input = (val_sec_pcs * act) / 60 if (act > 0 and not is_repair) else 0
+    persen_prod   = round((standar_input / durasi_bersih_menit) * 100, 2) if (durasi_bersih_menit > 0 and not is_repair) else 0.0
+    rasio_ng      = round(ng / act * 100, 2) if (act > 0 and not is_repair) else 0.0
+
+    with kanan:
+        with st.container(key="card_preview"):
+            ui.judul("Pratinjau SPH", "Diperbarui otomatis saat Anda mengisi.")
+            ui.kpi_grid([
+                ("% Produksi", "N/A" if is_repair else f"{persen_prod:.1f}%",
+                 "hero " + ("" if is_repair else "ok" if persen_prod >= 85 else "accent" if persen_prod >= 60 else "bad")),
+                ("Rasio NG", "N/A" if is_repair else f"{rasio_ng:.2f}%",
+                 "" if is_repair else "ok" if rasio_ng <= 1 else "accent" if rasio_ng <= 3 else "bad"),
+                ("Durasi Bersih", f"{int(durasi_bersih_menit // 60)}j {int(durasi_bersih_menit % 60)}m", "",
+                 f"Kotor {int(durasi_kotor_menit)}m − istirahat {total_potongan}m"),
+                ("Waktu", f"{dt_start:%H:%M}–{dt_finish:%H:%M}", ""),
+            ])
+            if ng > act > 0:
+                st.warning("NG lebih besar dari ACT. Periksa kembali angkanya.")
+
+    st.write("")
+
+    # ---------- Kirim SPH ----------
+    if not sudah_terkirim:
+        b1, b2 = st.columns([1, 3], gap="medium")
+        with b1:
+            if st.button("← Kembali", width="stretch"):
+                st.session_state.status_kerja = "RUNNING"
+                st.rerun()
+        with b2:
+            if st.button("KIRIM DATA SPH", key="go_kirim_sph", width="stretch"):
+                if act <= 0:
+                    st.error("⚠️ Jumlah ACT harus lebih dari 0.")
+                else:
+                    data_finish = {
+                        "actual_time_finish": dt_finish,
+                        "act":                act,
+                        "ng":                 ng,
+                        "persen_prod":        None if is_repair else persen_prod,   # NULL = N/A
+                        "total_istirahat":    total_potongan,
+                        "rasio_ng":           None if is_repair else rasio_ng,
+                        "total_jam":          round(total_jam_actual, 2),
+                    }
+                    try:
+                        proses_id = dp.get("proses_id")
+                        if not proses_id:                       # jaga-jaga sesi lama
+                            aktif = db.get_active_proses(nik_karyawan)
+                            proses_id = aktif["id"] if aktif and aktif["part_no"] == dp["part_no"] else None
+                        if not proses_id:
+                            st.error("❌ Tidak ditemukan data START aktif untuk Part ini. Lakukan Start dulu.")
+                        else:
+                            with st.spinner("Menyimpan SPH..."):
+                                db.finish_proses(proses_id, data_finish)
+                            st.session_state.data_sph_terkirim = True
+                            st.session_state.actual_summary_data = {
+                                "total_waktu_actual": total_waktu_actual_str,
+                                "persen_prod":        persen_prod,
+                                "total_jam":          round(total_jam_actual, 2),
+                                "rasio_ng":           rasio_ng,
+                                "is_repair":          is_repair,
+                                "act":                act,
+                                "ng":                 ng,
+                            }
+                            flash("SPH terkirim!")
+                            st.rerun()
+                    except DBError as e:
+                        tampilkan_error(e, "Gagal menyimpan SPH")
+
+    # ---------- Ringkasan setelah terkirim ----------
+    else:
+        s = st.session_state.get("actual_summary_data", {})
+        st.success("✅ Data SPH sudah tercatat di database.")
+        ui.kpi_grid([
+            ("% Produksi", "N/A" if s.get("is_repair") else f"{s.get('persen_prod', 0):.2f}%", "hero accent"),
+            ("ACT / NG", f"{s.get('act', 0)} / {s.get('ng', 0)}", "hero"),
+            ("Rasio NG", "N/A" if s.get("is_repair") else f"{s.get('rasio_ng', 0):.2f}%", "hero"),
+            ("Total Waktu", s.get("total_waktu_actual", "-"), "hero", f"{s.get('total_jam', 0)} jam"),
+        ])
+        if st.button("SELESAI · SCAN PART BARU", key="go_selesai", width="stretch"):
+            reset_keys(KEYS_PROSES)
+            st.session_state.status_kerja = "IDLE"
+            flash("Laporan proses selesai. Siap scan part baru.", "🎉")
+            st.rerun()
+
+
+# ============================================================
+# Reset untuk layar IDLE (bila scanner macet)
+# ============================================================
+if tahap == "IDLE":
+    st.divider()
+    if st.button("Reset Scanner", width="stretch"):
+        reset_keys(KEYS_PROSES)
+        st.rerun()
