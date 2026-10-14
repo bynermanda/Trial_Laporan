@@ -19,7 +19,7 @@
 |---|---|---|
 | Master_Karyawan | `master_karyawan` | NIK disimpan tanpa titik/kutip; kolom `aktif` untuk menonaktifkan karyawan. |
 | MainData | `main_data` + `master_line` | Unik per (part_no, urutan). Daftar line kini dari tabel, bukan hardcode. |
-| Waktu Kerja | `waktu_kerja` | `check_in`/`check_out` = timestamptz. |
+| Waktu Kerja | `waktu_kerja` | Tidak dipakai lagi (fitur Check-In/Out dihapus); tabel dibiarkan untuk data lama. |
 | Proses | `proses` | Terhubung ke `waktu_kerja` (shift). Kolom kosong `Waktu_Mulai`/`Waktu_Selesai` dihapus. `%_Prod` & `Rasio_NG` disimpan sebagai angka (NULL = N/A untuk DPMR). |
 | ABNORMAL | `abnormal` + `master_kode_abnormal` | Terhubung ke `proses`; kode abnormal kini dari tabel. |
 
@@ -47,8 +47,7 @@ Alternatif lewat komputer: `pip install -r requirements.txt`, buat `.streamlit/s
 
 ## Checklist uji manual (dengan 1 HP)
 
-- [ ] Scan QR ID valid → masuk layar Check-In. QR NIK tak terdaftar → "Akses Ditolak".
-- [ ] Check-In → baris baru di `waktu_kerja`. Klik dua kali cepat → tetap 1 baris.
+- [ ] Scan QR ID valid → langsung masuk layar Scan KANBAN (tanpa Check-In). QR NIK tak terdaftar → "Akses Ditolak".
 - [ ] Scan KANBAN → pilih Condition **Overtime**, Actual Line, urutan → Konfirmasi.
 - [ ] Ubah jam start manual (mis. 15 menit lalu) → Konfirmasi Start → cek `proses.actual_time_start` di view = jam WIB yang dipilih, `condition` = Overtime.
 - [ ] Tutup browser, buka lagi, scan ID → proses langsung dipulihkan (RUNNING) dengan jam start yang benar.
@@ -56,7 +55,7 @@ Alternatif lewat komputer: `pip install -r requirements.txt`, buat `.streamlit/s
 - [ ] Scan KANBAN berbeda → ditolak. Scan KANBAN sama → layar FINISHING.
 - [ ] Isi ACT/NG, jam finish manual, break → Kirim SPH → status FINISH, %_Prod & Rasio_NG sesuai hitungan lama.
 - [ ] Ulangi dengan urutan DPMR → `persen_prod` & `rasio_ng` NULL (tampil N/A).
-- [ ] Check-Out saat masih ada START → ditolak. Setelah selesai → `check_out` terisi.
+- [ ] Tombol KELUAR / GANTI OPERATOR kembali ke layar Scan ID.
 - [ ] Uji shift malam: start 23:50, finish 00:30 → `total_jam` positif dan benar.
 
 ## Yang berubah dibanding versi Google Sheets

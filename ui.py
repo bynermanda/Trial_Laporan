@@ -6,8 +6,8 @@ panel produksi dengan timer live. Tidak ada logika database di sini.
 
 Cara memberi gaya pada tombol/kontainer Streamlit: pakai `key=`.
 Streamlit menambahkan class `st-key-<key>` sehingga bisa ditarget CSS:
-  key diawali "go_"    → tombol aksi utama hijau besar (Check-In, Start, Kirim)
-  key diawali "stop_"  → tombol berbahaya bergaris merah (Check-Out)
+  key diawali "go_"    → tombol aksi utama hijau besar (Start, Kirim, Selesai)
+  key diawali "stop_"  → tombol bergaris merah (Keluar)
   key diawali "card_"  → kontainer berbentuk kartu
 """
 from __future__ import annotations
@@ -85,15 +85,31 @@ hr {{ border-color:var(--border) !important; margin:.8rem 0 !important; }}
   background:transparent !important; color:var(--danger) !important; border-color:var(--danger) !important;
 }}
 
-/* ---------- Pills / segmented control ---------- */
-[data-testid="stButtonGroup"] button {{
-  min-height:56px; padding:0 22px !important; border-radius:12px !important;
-  background:var(--surface-2) !important; border:2px solid var(--border-strong) !important; color:var(--text) !important;
+/* ---------- Pilihan berbentuk chip (radio & checkbox) ----------
+   Opsi terpilih ditandai lewat :has(input:checked) → selalu terlihat jelas. */
+[data-testid="stRadio"] [role="radiogroup"] {{ display:flex; flex-wrap:wrap; gap:10px; }}
+[data-testid="stRadio"] label[data-baseweb="radio"],
+[data-testid="stCheckbox"] label[data-baseweb="checkbox"] {{
+  min-height:58px; min-width:110px; margin:0 !important; padding:0 20px !important;
+  display:flex; align-items:center; justify-content:center; gap:10px;
+  background:var(--surface-2); border:2px solid var(--border-strong); border-radius:12px;
+  cursor:pointer; transition:background .12s, border-color .12s;
 }}
-[data-testid="stButtonGroup"] button p {{ font-size:18px !important; font-weight:800 !important; color:inherit !important; }}
-[data-testid="stButtonGroup"] button[kind*="Active"] {{
-  background:var(--accent) !important; border-color:var(--accent) !important; color:var(--accent-ink) !important;
+[data-testid="stCheckbox"] label[data-baseweb="checkbox"] {{ width:100%; justify-content:flex-start; }}
+[data-testid="stRadio"] label[data-baseweb="radio"] > div:first-child {{ display:none; }}   /* sembunyikan bulatan */
+[data-testid="stRadio"] label[data-baseweb="radio"] p,
+[data-testid="stCheckbox"] label[data-baseweb="checkbox"] p {{
+  font-size:19px !important; font-weight:800 !important; color:var(--text) !important; text-transform:none; letter-spacing:.2px;
 }}
+[data-testid="stRadio"] label[data-baseweb="radio"]:has(input:checked),
+[data-testid="stCheckbox"] label[data-baseweb="checkbox"]:has(input:checked) {{
+  background:var(--accent); border-color:var(--accent); box-shadow:0 0 0 3px rgba(255,176,32,.25);
+}}
+[data-testid="stRadio"] label[data-baseweb="radio"]:has(input:checked) p,
+[data-testid="stCheckbox"] label[data-baseweb="checkbox"]:has(input:checked) p {{ color:var(--accent-ink) !important; }}
+[data-testid="stRadio"] label[data-baseweb="radio"]:has(input:checked) p::before,
+[data-testid="stCheckbox"] label[data-baseweb="checkbox"]:has(input:checked) p::before {{ content:"✓ "; }}
+[data-testid="stCheckbox"] label[data-baseweb="checkbox"]:has(input:disabled) {{ opacity:.55; }}
 
 /* ---------- Input ---------- */
 .stTextInput input, .stNumberInput input {{
@@ -190,14 +206,13 @@ hr {{ border-color:var(--border) !important; margin:.8rem 0 !important; }}
 
 STATUS_PILL = {
     "LOGIN":             ("BELUM LOGIN", "idle"),
-    "CHECKIN":           ("BELUM CHECK-IN", "warn"),
     "IDLE":              ("SIAP SCAN", "info"),
     "SELECTING_PROCESS": ("PILIH PROSES", "info"),
     "RUNNING":           ("PRODUKSI", "run"),
     "FINISHING":         ("LAPORAN AKHIR", "warn"),
 }
-LANGKAH = ["Scan ID", "Check-In", "Pilih Part", "Produksi", "Laporan"]
-POSISI_LANGKAH = {"LOGIN": 0, "CHECKIN": 1, "IDLE": 2, "SELECTING_PROCESS": 2, "RUNNING": 3, "FINISHING": 4}
+LANGKAH = ["Scan ID", "Pilih Part", "Produksi", "Laporan"]
+POSISI_LANGKAH = {"LOGIN": 0, "IDLE": 1, "SELECTING_PROCESS": 1, "RUNNING": 2, "FINISHING": 3}
 
 
 def esc(v) -> str:

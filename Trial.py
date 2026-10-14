@@ -2,10 +2,9 @@
 Laporan Produksi Dept. Press — PT Indosafety Sentosa
 Versi Supabase · tampilan "Industrial Dark / Operator Terminal".
 
-Alur layar:
+Alur layar (tanpa check-in/check-out):
   1. Scan ID Operator
-  2. Check-In
-  3. Area produksi: IDLE → SELECTING_PROCESS → RUNNING → FINISHING
+  2. Area laporan: IDLE → SELECTING_PROCESS → RUNNING → FINISHING
 
 Akses database ada di db.py, tema & komponen tampilan di ui.py.
 """
@@ -57,8 +56,9 @@ KEYS_PROSES = [
     "data_sph_terkirim", "available_processes", "sudah_start_diklik",
     "actual_summary_data", "ab_counter",
     "default_jam_start", "input_actual_time_start", "input_actual_time_finish",
-]
-KEYS_OPERATOR = ["nama_terpilih", "nik_karyawan", "shift"] + KEYS_PROSES
+    "radio_condition",
+] + [f"brk_{i}" for i in range(len(DAFTAR_BREAK))]
+KEYS_OPERATOR = ["nama_terpilih", "nik_karyawan"] + KEYS_PROSES
 
 
 # ============================================================
@@ -246,8 +246,6 @@ nik_karyawan = st.session_state.get("nik_karyawan", "")
 
 if not nik_karyawan:
     tahap = "LOGIN"
-elif not st.session_state.get("shift"):
-    tahap = "CHECKIN"
 else:
     tahap = st.session_state.get("status_kerja", "IDLE")
 
@@ -281,7 +279,6 @@ if tahap == "LOGIN":
                         st.session_state.nama_terpilih = kary.get("nama") or raw_nama
 
                         with st.spinner("Mengecek status kerja terakhir..."):
-                            st.session_state.shift = db.get_active_shift(nik)
                             aktif = db.get_active_proses(nik)
 
                         if aktif:
@@ -299,46 +296,17 @@ if tahap == "LOGIN":
 
 
 # ============================================================
-# LAYAR 2: CHECK-IN
-# ============================================================
-elif tahap == "CHECKIN":
-    _, tengah, _ = st.columns([1, 2, 1])
-    with tengah:
-        with st.container(key="card_checkin"):
-            ui.judul("Langkah 2 · Mulai Shift")
-            st.markdown(
-                f'<div class="hint">Selamat datang,</div>'
-                f'<div class="bigname">{ui.esc(nama_karyawan)}</div>'
-                f'<div class="hint mono">NIK {ui.esc(nik_karyawan)} · Belum Check-In</div>',
-                unsafe_allow_html=True,
-            )
-            if st.button("CHECK-IN SEKARANG", key="go_checkin", width="stretch"):
-                try:
-                    with st.spinner("Menyimpan Check-In..."):
-                        st.session_state.shift = db.check_in(nik_karyawan, nama_karyawan)
-                    st.session_state.status_kerja = "IDLE"
-                    jam = parse_ts(st.session_state.shift["check_in"]).strftime("%H:%M:%S")
-                    flash(f"Check-In berhasil pukul {jam}. Scanner Part siap.")
-                    st.rerun()
-                except DBError as e:
-                    tampilkan_error(e, "Gagal Check-In")
-
-        if st.button("⬅️ Bukan saya · Scan ulang ID", width="stretch"):
-            reset_keys(KEYS_OPERATOR)
-            st.rerun()
-
-
-# ============================================================
-# LAYAR 3: IDLE — scan kanban / input manual / check-out
+# LAYAR 2: IDLE — scan kanban / input manual
 # ============================================================
 elif tahap == "IDLE":
-    shift = st.session_state.shift
-    jam_masuk = parse_ts(shift["check_in"])
-    lama_shift = now_wib() - jam_masuk
+    try:
+        rekap = db.ringkasan_hari_ini(nik_karyawan)
+    except DBError:
+        rekap = None
     ui.kpi_grid([
-        ("Check-In", jam_masuk.strftime("%H:%M"), "", jam_masuk.strftime("%d %b %Y")),
-        ("Lama Shift", f"{int(lama_shift.total_seconds() // 3600)}j {int(lama_shift.total_seconds() % 3600 // 60)}m", ""),
-        ("Status", "SIAP", "ok", "Scan KANBAN untuk mulai"),
+        ("Tanggal", now_wib().strftime("%d %b %Y"), ""),
+        ("Laporan Hari Ini", f"{rekap['jumlah']} part" if rekap else "—", "", "SPH terkirim"),
+        ("Total ACT Hari Ini", f"{rekap['act']} pcs" if rekap else "—", "ok"),
     ])
 
     kiri, kanan = st.columns([3, 2], gap="medium")
@@ -358,30 +326,14 @@ elif tahap == "IDLE":
                 handle_scan(manual_input)
 
         st.write("")
-        with st.container(key="stop_checkout"):
-            with st.popover("⏻  SELESAI SHIFT (CHECK-OUT)", width="stretch"):
-                st.markdown("### Akhiri shift sekarang?")
-                st.caption("Pastikan semua proses sudah FINISH dan SPH terkirim.")
-                if st.button("YA, CHECK-OUT", key="stop_confirm_checkout", width="stretch"):
-                    try:
-                        with st.spinner("Memproses Check-Out..."):
-                            aktif = db.get_active_proses(nik_karyawan)
-                            if aktif:
-                                st.error(f"❌ Masih ada proses aktif: **{aktif['part_no']}**. Selesaikan dulu.")
-                            else:
-                                total_jam = db.check_out(st.session_state.shift)
-                                reset_keys(KEYS_OPERATOR)
-                                flash(f"Check-Out berhasil. Total jam kerja: {total_jam} jam", "👋")
-                                st.rerun()
-                    except DBError as e:
-                        tampilkan_error(e, "Gagal Check-Out")
-                if st.button("Ganti Operator", width="stretch"):
-                    reset_keys(KEYS_OPERATOR)
-                    st.rerun()
+        if st.button("⏻  KELUAR / GANTI OPERATOR", key="stop_logout", width="stretch"):
+            reset_keys(KEYS_OPERATOR)
+            flash("Anda sudah keluar. Silakan scan ID berikutnya.", "👋")
+            st.rerun()
 
 
 # ============================================================
-# LAYAR 4: SELECTING_PROCESS — kondisi, line & urutan proses
+# LAYAR 3: SELECTING_PROCESS — kondisi, line & urutan proses
 # ============================================================
 elif tahap == "SELECTING_PROCESS":
     data_pilihan = list(st.session_state.get("available_processes", []))
@@ -419,18 +371,18 @@ elif tahap == "SELECTING_PROCESS":
         with st.container(key="card_pilih_proses"):
             ui.judul("1 · Urutan Proses")
             if len(opsi_display) <= 12:
-                pilihan_user = st.pills("Urutan proses", options=list(opsi_display.keys()),
-                                        default=list(opsi_display.keys())[0], key="pill_urutan",
+                pilihan_user = st.radio("Urutan proses", options=list(opsi_display.keys()), index=0,
+                                        horizontal=True, key=f"radio_urutan_{contoh.get('part_no')}",
                                         label_visibility="collapsed")
             else:
                 pilihan_user = st.selectbox("Urutan proses", options=list(opsi_display.keys()),
-                                            key="sel_urutan", label_visibility="collapsed")
+                                            key=f"sel_urutan_{contoh.get('part_no')}", label_visibility="collapsed")
 
             ui.judul("2 · Kondisi Kerja")
-            selected_condition = st.segmented_control(
-                "Kondisi", options=["Normal", "Overtime"], default="Normal",
-                key="seg_condition", label_visibility="collapsed",
-            ) or "Normal"
+            selected_condition = st.radio(
+                "Kondisi", options=["Normal", "Overtime"], index=0, horizontal=True,
+                key="radio_condition", label_visibility="collapsed",
+            )
 
     with kanan:
         with st.container(key="card_pilih_line"):
@@ -475,7 +427,7 @@ elif tahap == "SELECTING_PROCESS":
 
 
 # ============================================================
-# LAYAR 5: RUNNING — proses produksi berjalan
+# LAYAR 4: RUNNING — proses produksi berjalan
 # ============================================================
 elif tahap == "RUNNING":
     dp = st.session_state.get("current_part")
@@ -519,7 +471,6 @@ elif tahap == "RUNNING":
 
             data_start = {
                 "tanggal":           start_dt.date(),
-                "waktu_kerja_id":    st.session_state.shift["id"],
                 "nik":               nik_karyawan,
                 "nama":              nama_karyawan,
                 "part_no":           dp["part_no"],
@@ -629,7 +580,7 @@ elif tahap == "RUNNING":
 
 
 # ============================================================
-# LAYAR 6: FINISHING — ACT, NG, jam finish, istirahat, kirim SPH
+# LAYAR 5: FINISHING — ACT, NG, jam finish, istirahat, kirim SPH
 # ============================================================
 elif tahap == "FINISHING":
     dp = st.session_state.get("current_part")
@@ -672,9 +623,11 @@ elif tahap == "FINISHING":
             )
 
             ui.judul("3 · Potongan Istirahat")
-            pilihan_break = st.pills("Break", options=list(DAFTAR_BREAK.keys()), selection_mode="multi",
-                                     key="pills_break", disabled=sudah_terkirim,
-                                     label_visibility="collapsed") or []
+            kolom_break = st.columns(3, gap="small")
+            pilihan_break = [
+                nama for i, nama in enumerate(DAFTAR_BREAK)
+                if kolom_break[i % 3].checkbox(nama, key=f"brk_{i}", disabled=sudah_terkirim)
+            ]
             extra_custom = st.number_input("Potongan lain (menit)", min_value=0, step=1, value=0,
                                            disabled=sudah_terkirim)
 

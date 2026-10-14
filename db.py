@@ -283,6 +283,20 @@ def get_active_proses(nik: str) -> dict | None:
     return res.data[0] if res.data else None
 
 
+def ringkasan_hari_ini(nik: str) -> dict:
+    """Jumlah SPH terkirim & total ACT operator ini untuk tanggal WIB hari ini."""
+    res = run_query(
+        lambda c: c.table("proses")
+        .select("act")
+        .eq("nik", nik)
+        .eq("status", "FINISH")
+        .eq("tanggal", now_wib().date().isoformat()),
+        "rekap hari ini",
+    )
+    rows = res.data or []
+    return {"jumlah": len(rows), "act": sum(int(r.get("act") or 0) for r in rows)}
+
+
 def start_proses(data: dict) -> dict:
     """
     INSERT baris START. Unique index `uq_proses_aktif_per_operator` menjamin
