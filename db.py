@@ -297,6 +297,39 @@ def ringkasan_hari_ini(nik: str) -> dict:
     return {"jumlah": len(rows), "act": sum(int(r.get("act") or 0) for r in rows)}
 
 
+def _ambil_semua(build: Callable[[Client], Any], op: str, batch: int = 1000) -> list[dict]:
+    """Ambil seluruh baris per 1000 (batas default Supabase per request)."""
+    rows, mulai = [], 0
+    while True:
+        res = run_query(lambda c: build(c).range(mulai, mulai + batch - 1), op)
+        data = res.data or []
+        rows.extend(data)
+        if len(data) < batch:
+            return rows
+        mulai += batch
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def get_laporan_proses(tgl_awal: date, tgl_akhir: date) -> list[dict]:
+    """Semua baris proses (START & FINISH) dalam rentang tanggal WIB."""
+    return _ambil_semua(
+        lambda c: c.table("proses").select("*")
+        .gte("tanggal", tgl_awal.isoformat()).lte("tanggal", tgl_akhir.isoformat())
+        .order("actual_time_start", desc=True).order("id", desc=True),
+        "baca laporan proses",
+    )
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def get_laporan_abnormal(tgl_awal: date, tgl_akhir: date) -> list[dict]:
+    return _ambil_semua(
+        lambda c: c.table("abnormal").select("*")
+        .gte("tanggal", tgl_awal.isoformat()).lte("tanggal", tgl_akhir.isoformat())
+        .order("tanggal", desc=True).order("jam_input", desc=True).order("id", desc=True),
+        "baca laporan abnormal",
+    )
+
+
 def start_proses(data: dict) -> dict:
     """
     INSERT baris START. Unique index `uq_proses_aktif_per_operator` menjamin

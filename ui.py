@@ -128,36 +128,44 @@ hr {{ border-color:var(--border) !important; margin:.8rem 0 !important; }}
 [data-baseweb="select"] input {{ font-size:19px !important; }}
 [data-baseweb="popover"] li {{ min-height:48px; font-size:18px !important; }}
 
+/* ---------- Tabs umum (mis. halaman Admin) ---------- */
+.stTabs [data-baseweb="tab-list"] {{ gap:8px; border-bottom:2px solid var(--border); flex-wrap:wrap; }}
+.stTabs [data-baseweb="tab"] {{ min-height:54px; padding:0 18px; background:var(--surface); border-radius:12px 12px 0 0; }}
+.stTabs [data-baseweb="tab"] p {{ font-size:17px !important; font-weight:800 !important; color:var(--muted) !important; }}
+.stTabs [aria-selected="true"] {{ background:var(--surface-2) !important; box-shadow:inset 0 -4px 0 var(--accent); }}
+.stTabs [aria-selected="true"] p {{ color:var(--accent) !important; }}
+.stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] {{ display:none !important; }}
+
 /* ---------- Tabs = 2 tombol besar FINISH (hijau) & ABNORMAL (amber) ---------- */
-.stTabs [data-baseweb="tab-list"] {{
+.st-key-aksi_produksi .stTabs [data-baseweb="tab-list"] {{
   display:grid !important; grid-template-columns:1fr 1fr; gap:12px; border:none !important; margin-bottom:6px;
 }}
-.stTabs [data-baseweb="tab"] {{
+.st-key-aksi_produksi .stTabs [data-baseweb="tab"] {{
   min-height:92px; height:auto; padding:10px 12px !important; border-radius:16px !important;
   justify-content:center; border:3px solid var(--border-strong) !important; background:var(--surface-2) !important;
   transition:transform .06s ease;
 }}
-.stTabs [data-baseweb="tab"]:active {{ transform:scale(.98); }}
-.stTabs [data-baseweb="tab"] p {{ font-size:clamp(20px, 4.6vw, 28px) !important; font-weight:800 !important; letter-spacing:1px; }}
+.st-key-aksi_produksi .stTabs [data-baseweb="tab"]:active {{ transform:scale(.98); }}
+.st-key-aksi_produksi .stTabs [data-baseweb="tab"] p {{ font-size:clamp(20px, 4.6vw, 28px) !important; font-weight:800 !important; letter-spacing:1px; }}
 /* FINISH */
-.stTabs button[data-baseweb="tab"]:nth-of-type(1) {{ border-color:var(--ok) !important; background:rgba(34,197,94,.10) !important; }}
-.stTabs button[data-baseweb="tab"]:nth-of-type(1) p {{ color:var(--ok) !important; }}
-.stTabs button[data-baseweb="tab"]:nth-of-type(1)[aria-selected="true"] {{
+.st-key-aksi_produksi .stTabs button[data-baseweb="tab"]:nth-of-type(1) {{ border-color:var(--ok) !important; background:rgba(34,197,94,.10) !important; }}
+.st-key-aksi_produksi .stTabs button[data-baseweb="tab"]:nth-of-type(1) p {{ color:var(--ok) !important; }}
+.st-key-aksi_produksi .stTabs button[data-baseweb="tab"]:nth-of-type(1)[aria-selected="true"] {{
   background:var(--ok) !important; box-shadow:0 8px 24px rgba(34,197,94,.30);
 }}
-.stTabs button[data-baseweb="tab"]:nth-of-type(1)[aria-selected="true"] p {{ color:var(--ok-ink) !important; }}
+.st-key-aksi_produksi .stTabs button[data-baseweb="tab"]:nth-of-type(1)[aria-selected="true"] p {{ color:var(--ok-ink) !important; }}
 /* ABNORMAL */
-.stTabs button[data-baseweb="tab"]:nth-of-type(2) {{ border-color:var(--accent) !important; background:rgba(255,176,32,.10) !important; }}
-.stTabs button[data-baseweb="tab"]:nth-of-type(2) p {{ color:var(--accent) !important; }}
-.stTabs button[data-baseweb="tab"]:nth-of-type(2)[aria-selected="true"] {{
+.st-key-aksi_produksi .stTabs button[data-baseweb="tab"]:nth-of-type(2) {{ border-color:var(--accent) !important; background:rgba(255,176,32,.10) !important; }}
+.st-key-aksi_produksi .stTabs button[data-baseweb="tab"]:nth-of-type(2) p {{ color:var(--accent) !important; }}
+.st-key-aksi_produksi .stTabs button[data-baseweb="tab"]:nth-of-type(2)[aria-selected="true"] {{
   background:var(--accent) !important; box-shadow:0 8px 24px rgba(255,176,32,.30);
 }}
-.stTabs button[data-baseweb="tab"]:nth-of-type(2)[aria-selected="true"] p {{ color:var(--accent-ink) !important; }}
+.st-key-aksi_produksi .stTabs button[data-baseweb="tab"]:nth-of-type(2)[aria-selected="true"] p {{ color:var(--accent-ink) !important; }}
 /* tab yang tidak aktif berkedip halus agar operator tahu tombol itu ada */
-.stTabs button[data-baseweb="tab"][aria-selected="false"] {{ animation:ajak 2.2s ease-in-out infinite; }}
+.st-key-aksi_produksi .stTabs button[data-baseweb="tab"][aria-selected="false"] {{ animation:ajak 2.2s ease-in-out infinite; }}
 @keyframes ajak {{ 50% {{ filter:brightness(1.35); }} }}
-.stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"] {{ display:none !important; }}
-.stTabs [data-baseweb="tab-panel"] {{ padding-top:10px; }}
+.st-key-aksi_produksi .stTabs [data-baseweb="tab-highlight"], .st-key-aksi_produksi .stTabs [data-baseweb="tab-border"] {{ display:none !important; }}
+.st-key-aksi_produksi .stTabs [data-baseweb="tab-panel"] {{ padding-top:10px; }}
 .aksi-hint {{ display:flex; gap:10px; align-items:center; margin:14px 0 8px; font-size:16px; font-weight:700; color:var(--text); }}
 .aksi-hint b.f {{ color:var(--ok); }} .aksi-hint b.a {{ color:var(--accent); }}
 
@@ -248,6 +256,7 @@ STATUS_PILL = {
     "SELECTING_PROCESS": ("PILIH PROSES", "info"),
     "RUNNING":           ("PRODUKSI", "run"),
     "FINISHING":         ("LAPORAN AKHIR", "warn"),
+    "ADMIN":             ("ADMIN · DATA", "warn"),
 }
 LANGKAH = ["Scan ID", "Pilih Part", "Produksi", "Laporan"]
 POSISI_LANGKAH = {"LOGIN": 0, "IDLE": 1, "SELECTING_PROCESS": 1, "RUNNING": 2, "FINISHING": 3}
@@ -279,7 +288,7 @@ def topbar(tahap: str, nama: str = "", nik: str = "") -> None:
             <div><b>PRESS TERMINAL</b><small>PT INDOSAFETY SENTOSA</small></div></div>
           <div class="op">{operator}<span class="pill {cls}">{label}</span></div>
         </div>
-        <div class="steps">{langkah}</div>
+        {'' if tahap == 'ADMIN' else f'<div class="steps">{langkah}</div>'}
         """,
         unsafe_allow_html=True,
     )

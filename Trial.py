@@ -208,7 +208,13 @@ def menu_admin() -> None:
             st.info("Tambahkan [admin] pin = \"....\" di Secrets untuk membuka menu import.")
             return
         if st.text_input("PIN Admin", type="password", key="admin_pin") != pin_benar:
+            st.session_state.pop("admin_ok", None)
             return
+        st.session_state.admin_ok = True
+
+        if st.button("📊  BUKA DATA LAPORAN", key="go_data_laporan", width="stretch"):
+            st.session_state.halaman = "ADMIN"
+            st.rerun()
 
         if st.button("🔌 Cek Koneksi Database", width="stretch"):
             try:
@@ -244,7 +250,9 @@ tampilkan_flash()
 nama_karyawan = st.session_state.get("nama_terpilih", "")
 nik_karyawan = st.session_state.get("nik_karyawan", "")
 
-if not nik_karyawan:
+if not nik_karyawan and st.session_state.get("halaman") == "ADMIN" and st.session_state.get("admin_ok"):
+    tahap = "ADMIN"
+elif not nik_karyawan:
     tahap = "LOGIN"
 else:
     tahap = st.session_state.get("status_kerja", "IDLE")
@@ -255,7 +263,11 @@ ui.topbar(tahap, nama_karyawan, nik_karyawan)
 # ============================================================
 # LAYAR 1: SCAN ID OPERATOR
 # ============================================================
-if tahap == "LOGIN":
+if tahap == "ADMIN":
+    import laporan_admin
+    laporan_admin.tampilkan()
+
+elif tahap == "LOGIN":
     _, tengah, _ = st.columns([1, 2, 1])
     with tengah:
         with st.container(key="card_login"):
@@ -503,7 +515,8 @@ elif tahap == "RUNNING":
         'atau <b class="a">ABNORMAL</b> untuk mencatat kendala.</div>',
         unsafe_allow_html=True,
     )
-    tab_finish, tab_abnormal = st.tabs(["🏁 FINISH", "⚠️ ABNORMAL"])
+    aksi_produksi = st.container(key="aksi_produksi")
+    tab_finish, tab_abnormal = aksi_produksi.tabs(["🏁 FINISH", "⚠️ ABNORMAL"])
 
     with tab_finish:
         kiri, kanan = st.columns([3, 2], gap="medium")
