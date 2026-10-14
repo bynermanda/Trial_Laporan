@@ -57,6 +57,7 @@ create table if not exists public.main_data (
     constraint uq_main_data_part_urutan unique (part_no, urutan)
 );
 create index if not exists ix_main_data_part_no on public.main_data (part_no);
+create index if not exists ix_main_data_line on public.main_data (line);
 
 
 -- ---------------------------------------------------------------------
@@ -81,6 +82,7 @@ create table if not exists public.waktu_kerja (
 create unique index if not exists uq_waktu_kerja_shift_aktif
     on public.waktu_kerja (nik) where check_out is null;
 create index if not exists ix_waktu_kerja_tanggal on public.waktu_kerja (tanggal);
+create index if not exists ix_waktu_kerja_nik on public.waktu_kerja (nik);
 
 
 -- ---------------------------------------------------------------------
@@ -124,10 +126,12 @@ create unique index if not exists uq_proses_aktif_per_operator
 create index if not exists ix_proses_tanggal on public.proses (tanggal);
 create index if not exists ix_proses_part_no on public.proses (part_no);
 create index if not exists ix_proses_waktu_kerja on public.proses (waktu_kerja_id);
+create index if not exists ix_proses_nik on public.proses (nik);
+create index if not exists ix_proses_actual_line on public.proses (actual_line);
 
 -- updated_at otomatis
 create or replace function public.set_updated_at()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql set search_path = '' as $$
 begin
     new.updated_at := now();
     return new;
@@ -165,6 +169,8 @@ create table if not exists public.abnormal (
 );
 create index if not exists ix_abnormal_tanggal on public.abnormal (tanggal);
 create index if not exists ix_abnormal_proses on public.abnormal (proses_id);
+create index if not exists ix_abnormal_nik on public.abnormal (nik);
+create index if not exists ix_abnormal_kode on public.abnormal (kode_abnormal);
 
 
 -- ---------------------------------------------------------------------

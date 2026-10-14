@@ -117,6 +117,48 @@ if st.sidebar.button("🔄 Update Data Master"):
     st.sidebar.success("Data master diperbarui!")
 
 
+def sidebar_admin() -> None:
+    """Menu admin: cek koneksi & import CSV Master_Karyawan / MainData ke Supabase."""
+    with st.sidebar.expander("🛠️ Admin: Import Data Master"):
+        try:
+            pin_benar = str(st.secrets.get("admin", {}).get("pin", "")).strip()
+        except Exception:
+            pin_benar = ""
+        if not pin_benar:
+            st.info("Tambahkan [admin] pin = \"....\" di Secrets untuk membuka menu ini.")
+            return
+        if st.text_input("PIN Admin", type="password", key="admin_pin") != pin_benar:
+            return
+
+        if st.button("🔌 Cek Koneksi Database"):
+            try:
+                st.success(f"Terhubung. Karyawan terdaftar: {db.ping()}")
+            except DBError as e:
+                st.error(f"{e}")
+
+        st.caption("Google Sheets → File → Download → CSV, lalu upload di sini. Aman diulang (upsert).")
+        f_kary = st.file_uploader("Master_Karyawan.csv", type="csv", key="up_kary")
+        f_main = st.file_uploader("MainData.csv", type="csv", key="up_main")
+
+        if st.button("⬆️ Import ke Supabase", disabled=not (f_kary or f_main)):
+            import pandas as pd
+            import master_import as mi
+            try:
+                client = db.get_client()
+                if f_kary:
+                    n = mi.import_karyawan(client, pd.read_csv(f_kary, dtype=str))
+                    st.success(f"master_karyawan: {n} baris")
+                if f_main:
+                    n_line, n_part = mi.import_main_data(client, pd.read_csv(f_main, dtype=str))
+                    st.success(f"master_line: {n_line} baris, main_data: {n_part} baris")
+                st.cache_data.clear()
+            except Exception as e:
+                st.error(f"Import gagal: {e}")
+
+
+sidebar_admin()
+
+
 # ============================================================
 # HELPER UI
 # ============================================================

@@ -7,7 +7,8 @@
 | `supabase_schema.sql` | Tabel, relasi, index anti-dobel, view laporan, RLS. Jalankan sekali di SQL Editor. |
 | `db.py` | Lapisan database: koneksi, retry, semua fungsi CRUD. |
 | `Trial.py` | Aplikasi Streamlit (alur UI sama: IDLE → SELECTING_PROCESS → RUNNING → FINISHING). |
-| `import_master.py` | Pindahkan Master_Karyawan & MainData dari CSV Sheets ke Supabase. |
+| `master_import.py` | Logika konversi CSV Sheets → tabel Supabase (dipakai menu Admin & skrip). |
+| `import_master.py` | Import master dari komputer (alternatif menu Admin). |
 | `test_koneksi.py` | Uji koneksi + aturan anti-dobel, data uji dihapus otomatis. |
 | `requirements.txt` | Dependensi baru (gsheets, gspread, oauth2client, pytz dihapus). |
 | `secrets.toml.example` | Contoh konfigurasi kredensial. |
@@ -24,17 +25,25 @@
 
 Untuk tampilan persis seperti sheet lama (jam WIB, `%_Prod` berformat "83.33%"), buka view `v_laporan_proses`, `v_laporan_waktu_kerja`, `v_laporan_abnormal`.
 
-## Langkah implementasi
+## Langkah implementasi (tanpa perlu Python di komputer)
 
-1. **Buat project Supabase** (region Singapore `ap-southeast-1`, terdekat ke Karawang).
-2. **Jalankan skema**: Dashboard → SQL Editor → paste `supabase_schema.sql` → Run.
-3. **Kredensial**: Project Settings → API → salin *Project URL* dan *Secret key*. Salin `secrets.toml.example` ke `.streamlit/secrets.toml` dan isi. Tambahkan `.streamlit/secrets.toml` ke `.gitignore`.
-4. **Pasang dependensi**: `pip install -r requirements.txt`
-5. **Uji koneksi**: `python test_koneksi.py` → harus muncul `🎉 SEMUA TES LULUS`.
-6. **Import master**: download sheet `Master_Karyawan` & `MainData` sebagai CSV → `python import_master.py`.
-7. **Jalankan aplikasi lokal**: `streamlit run Trial.py`, lalu uji manual (checklist di bawah).
-8. **Deploy**: push ke GitHub (tanpa secrets.toml), lalu di Streamlit Cloud → Settings → Secrets paste isi `secrets.toml`.
-9. **Masa transisi**: jadikan Google Sheets read-only ±1 minggu sebagai cadangan.
+1. **Buat tabel**: Supabase Dashboard → project *Production Laporan_Press* → **SQL Editor** → New query → paste seluruh isi `supabase_schema.sql` → **Run**. Harus muncul "Success. No rows returned".
+2. **Ambil kredensial**: Project Settings → **API Keys** → salin *Secret key* (`sb_secret_...`). URL project: `https://ligyksfajemetxtdwjtn.supabase.co`.
+3. **Isi Secrets di Streamlit Cloud**: App → ⋮ → Settings → **Secrets**, paste:
+   ```toml
+   [supabase]
+   url = "https://ligyksfajemetxtdwjtn.supabase.co"
+   key = "sb_secret_...."
+
+   [admin]
+   pin = "PIN_PILIHAN_ANDA"
+   ```
+   Simpan, lalu **Reboot app**.
+4. **Import data master**: di Google Sheets, buka sheet `Master_Karyawan` → File → Download → CSV. Ulangi untuk sheet `MainData`. Di aplikasi, buka sidebar → **🛠️ Admin: Import Data Master** → isi PIN → klik **Cek Koneksi Database** → upload kedua CSV → **Import ke Supabase**.
+5. **Uji coba** dengan checklist di bawah.
+6. **Masa transisi**: jadikan Google Sheets read-only ±1 minggu sebagai cadangan.
+
+Alternatif lewat komputer: `pip install -r requirements.txt`, buat `.streamlit/secrets.toml` dari contoh, lalu `python test_koneksi.py` dan `python import_master.py`.
 
 ## Checklist uji manual (dengan 1 HP)
 
