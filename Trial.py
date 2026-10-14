@@ -497,8 +497,13 @@ elif tahap == "RUNNING":
             except DBError as e:
                 tampilkan_error(e, "Gagal menyimpan START")
 
-    # ---------------- Finish & Abnormal (tab) ----------------
-    tab_finish, tab_abnormal = st.tabs(["🏁  FINISH", "⚠️  ABNORMAL"])
+    # ---------------- Finish & Abnormal (2 tombol besar) ----------------
+    st.markdown(
+        '<div class="aksi-hint">👇 Tekan <b class="f">FINISH</b> untuk mengakhiri proses, '
+        'atau <b class="a">ABNORMAL</b> untuk mencatat kendala.</div>',
+        unsafe_allow_html=True,
+    )
+    tab_finish, tab_abnormal = st.tabs(["🏁 FINISH", "⚠️ ABNORMAL"])
 
     with tab_finish:
         kiri, kanan = st.columns([3, 2], gap="medium")
