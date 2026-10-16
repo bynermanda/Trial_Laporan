@@ -3,3 +3,4 @@ pandas
 supabase>=2.10
 streamlit-qrcode-scanner
 tzdata
+openpyxl
