@@ -90,6 +90,25 @@ ui.terapkan_tema()
 components.html(
     """
     <script>
+    // Polyfill untuk browser lama (Chrome < 110 / Safari < 16) yang belum punya
+    // fungsi array baru yang dipakai Streamlit → mencegah error "toSorted is not a function".
+    (function (w) {
+      try {
+        var A = w.Array.prototype;
+        function def(nama, fn) {
+          if (!A[nama]) Object.defineProperty(A, nama, { value: fn, writable: true, configurable: true });
+        }
+        def('toSorted',   function (cmp) { return this.slice().sort(cmp); });
+        def('toReversed', function () { return this.slice().reverse(); });
+        def('toSpliced',  function () { var a = this.slice(); A.splice.apply(a, arguments); return a; });
+        def('with',       function (i, v) { var a = this.slice(); if (i < 0) i += a.length; a[i] = v; return a; });
+        def('at',         function (i) { i = Math.trunc(i) || 0; if (i < 0) i += this.length; return this[i]; });
+        def('findLast',   function (f, t) { for (var i = this.length - 1; i >= 0; i--) if (f.call(t, this[i], i, this)) return this[i]; });
+        def('findLastIndex', function (f, t) { for (var i = this.length - 1; i >= 0; i--) if (f.call(t, this[i], i, this)) return i; return -1; });
+        if (!w.Object.hasOwn) w.Object.hasOwn = function (o, k) { return Object.prototype.hasOwnProperty.call(o, k); };
+      } catch (e) {}
+    })(window.parent);
+
     window.parent.addEventListener('beforeunload', function (e) {
         var msg = 'Data sedang diproses. Jika refresh, sesi scan akan hilang!';
         (e || window.event).returnValue = msg;
